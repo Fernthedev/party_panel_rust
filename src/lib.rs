@@ -20,6 +20,7 @@ use scotland2_rs::ModInfoBuf;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::runtime::{Builder, Runtime};
 use tokio_tungstenite::connect_async;
+use tracing::debug;
 
 // Define a static runtime
 static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
@@ -119,7 +120,6 @@ extern "C" fn party_panel_on_song_load(levels: *const *const BeatmapLevelPack, l
 }
 
 extern "C" {
-    #[no_mangle]
     fn quest_compat_init();
 }
 
@@ -132,9 +132,13 @@ extern "C" fn late_load() {
         .install()
         .unwrap();
 
+    debug!("Setting up SongCore events");
+    unsafe { quest_compat_init() };
+
+    debug!("Setting up websocket");
     RUNTIME.block_on(async {
         setup_client().await;
-    })
+    });
 }
 
 async fn setup_client() {

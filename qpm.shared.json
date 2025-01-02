@@ -15,7 +15,7 @@
     "workspace": {
       "scripts": {
         "build": [
-          "cargo ndk -t arm64-v8a -o ./build build --release"
+          "cargo ndk --bindgen -t arm64-v8a -o ./build build --release"
         ],
         "buildcpp": [
           "cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -B build_cmake",
