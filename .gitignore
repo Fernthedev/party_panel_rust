@@ -5,3 +5,9 @@ build/
 codegen-rs
 *.7z
 *.qmod
+extern/
+
+extern.cmake
+qpm_defines.cmake
+build_cmake/
+.cache

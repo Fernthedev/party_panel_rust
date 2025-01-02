@@ -2,20 +2,33 @@
 #![feature(generic_arg_infer)]
 
 use std::ffi::{c_char, CString};
+use std::sync::LazyLock;
 
 use bs_cordl::GlobalNamespace::{
     AudioClipAsyncLoader, BeatmapData, BeatmapDataLoader, BeatmapKey, BeatmapLevel,
-    BeatmapLevelsEntitlementModel, BeatmapLevelsModel, ColorScheme, EnvironmentsListModel,
-    GameplayModifiers, IReadonlyBeatmapData, LevelCompletionResults, NoteData,
-    OverrideEnvironmentSettings, PlayerSpecificSettings, PracticeSettings,
+    BeatmapLevelPack, BeatmapLevelsEntitlementModel, BeatmapLevelsModel, ColorScheme,
+    EnvironmentsListModel, GameplayModifiers, IReadonlyBeatmapData, LevelCompletionResults,
+    NoteData, OverrideEnvironmentSettings, PlayerSpecificSettings, PracticeSettings,
     RecordingToolManager_SetupData, SettingsManager, StandardLevelScenesTransitionSetupDataSO,
 };
-use bs_cordl::TMPro::TextMeshPro;
 use bs_cordl::UnityEngine::{self};
+use futures::{SinkExt, StreamExt};
 use quest_hook::hook;
 use quest_hook::libil2cpp::{Gc, Il2CppString};
 use scotland2_rs::scotland2_raw::CModInfo;
 use scotland2_rs::ModInfoBuf;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::runtime::{Builder, Runtime};
+use tokio_tungstenite::connect_async;
+
+// Define a static runtime
+static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all() // Enable features like timers and I/O
+        .worker_threads(1) // Single-threaded
+        .build()
+        .expect("Failed to create runtime")
+});
 
 #[hook("", "StandardLevelScenesTransitionSetupDataSO", "Init")]
 fn StandardLevelScenesTransitionSetupDataSO_Init(
@@ -90,6 +103,27 @@ extern "C" fn setup(modinfo: *mut CModInfo) {
 }
 
 #[no_mangle]
+extern "C" fn party_panel_on_song_load(levels: *const *const BeatmapLevelPack, len: usize) {
+    if len == 0 || levels.is_null() {
+        return;
+    }
+    // Safety: This function assumes valid pointers and length
+    unsafe {
+        let levels_slice = std::slice::from_raw_parts(levels, len);
+
+        let levels_converted: Vec<Gc<BeatmapLevelPack>> = levels_slice
+            .iter()
+            .map(|level| Gc::from(*level))
+            .collect::<Vec<_>>();
+    }
+}
+
+extern "C" {
+    #[no_mangle]
+    fn quest_compat_init();
+}
+
+#[no_mangle]
 extern "C" fn late_load() {
     StandardLevelScenesTransitionSetupDataSO_Init
         .install()
@@ -97,4 +131,16 @@ extern "C" fn late_load() {
     StandardLevelScenesTransitionSetupDataSO_Finish
         .install()
         .unwrap();
+
+    RUNTIME.block_on(async {
+        setup_client().await;
+    })
+}
+
+async fn setup_client() {
+    let url = "ws://"; // TODO:
+
+    let (ws_stream, _response) = connect_async(url).await.expect("Failed to connect");
+
+    println!("WebSocket handshake has been successfully completed");
 }
