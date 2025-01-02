@@ -1,7 +1,7 @@
 #![feature(box_patterns, extend_one)]
 #![feature(generic_arg_infer)]
 
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use bs_cordl::GlobalNamespace::{
     AudioClipAsyncLoader, BeatmapDataLoader, BeatmapKey, BeatmapLevel, BeatmapLevelPack,
@@ -16,10 +16,14 @@ use quest_hook::libil2cpp::{Gc, Il2CppString};
 use scotland2_rs::scotland2_raw::CModInfo;
 use scotland2_rs::ModInfoBuf;
 use tokio::runtime::Runtime;
+use tokio::sync::{OnceCell, RwLock};
 use tokio_tungstenite::connect_async;
 use tracing::debug;
 
+mod web_context;
+
 // Define a static runtime
+// We don't use tokio primitives here
 static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all() // Enable features like timers and I/O
@@ -27,6 +31,8 @@ static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
         .build()
         .expect("Failed to create runtime")
 });
+
+static mut WEB_CONTEXT: OnceCell<Arc<RwLock<Option<web_context::WebContext>>>> = OnceCell::const_new();
 
 #[hook("", "StandardLevelScenesTransitionSetupDataSO", "Init")]
 fn StandardLevelScenesTransitionSetupDataSO_Init(
