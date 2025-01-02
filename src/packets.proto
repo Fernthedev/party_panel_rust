@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package partypanel.packets;
+
+import "items.proto";
+
+// SongList message
+message SongList {
+    repeated partypanel.items.PreviewBeatmapLevel levels = 1;
+}
+
+// PreviewSong message
+message PreviewSong {
+    partypanel.items.PreviewBeatmapLevel level = 1;
+}
+
+// PlaySong message
+message PlaySong {
+    string level_id = 1;
+    string difficulty = 2;
+    partypanel.items.Characteristic characteristic = 3;
+    partypanel.items.GameplayModifiers gameplay_modifiers = 4;
+}
+
+// NowPlayingUpdate message
+message NowPlayingUpdate {
+    int32 score = 1;
+    double accuracy = 2;
+    int32 elapsed = 3;
+    int32 total_time = 4;
+}
+
+// NowPlaying message
+message NowPlaying {
+    string level_id = 1;
+    bool is_finished = 2;
+}
+
+// DownloadSong message
+message DownloadSong {
+    string level_id = 1;
+    string song_key = 2;
+}
+
+// Command message
+message Command {
+    enum CommandType {
+        COMMAND_TYPE_UNSPECIFIED = 0;
+        COMMAND_TYPE_HEARTBEAT = 1;
+        COMMAND_TYPE_RETURN_TO_MENU = 2;
+    }
+    CommandType command_type = 1;
+}
+
+// AllSongs message
+message AllSongs {
+    repeated SongList lists = 1;
+}

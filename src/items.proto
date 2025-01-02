@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package partypanel.items;
+
+// Existing messages remain the same
+message Characteristic {
+    string name = 1;
+    repeated string diffs = 2;
+}
+
+message PreviewBeatmapLevel {
+    string level_id = 1;
+    string name = 2;
+    string sub_name = 3;
+    string author = 4;
+    string mapper = 5;
+    string duration = 6;
+    float bpm = 7;
+    bytes cover = 8;
+    string cover_path = 9;
+    bool favorited = 10;
+    bool owned = 12;
+    string owned_justification = 13;
+    repeated Characteristic chars = 14;
+}
+
+// New messages converted from C# classes
+message PracticeSettings {
+    float song_speed = 1;
+}
+
+message PlayerSpecificSettings {
+    bool left_handed = 1;
+    bool no_texts_and_huds = 2;
+    bool advanced_hud = 3;
+    bool reduce_debris = 4;
+}
+
+message GameplayModifiers {
+    enum EnabledObstacleType {
+        ALL = 0;
+        FULL_HEIGHT_ONLY = 1;
+        NO_OBSTACLES = 2;
+    }
+    
+    enum SongSpeed {
+        NORMAL = 0;
+        FASTER = 1;
+        SLOWER = 2;
+        SUPER_FAST = 3;
+    }
+    
+    enum EnergyType {
+        BAR = 0;
+        BATTERY = 1;
+    }
+    
+    bool disappearing_arrows = 1;
+    EnabledObstacleType enabled_obstacle_type = 2;
+    EnergyType energy_type = 3;
+    bool fail_on_saber_clash = 4;
+    bool insta_fail = 5;
+    bool no_fail_on_0_energy = 6;
+    bool demo_no_obstacles = 7;
+    bool strict_angles = 8;
+    bool demo_no_fail = 9;
+    bool ghost_notes = 10;
+    bool no_bombs = 11;
+    SongSpeed song_speed = 12;
+    bool no_arrows = 13;
+    bool pro_mode = 14;
+    bool zen_mode = 15;
+    bool small_cubes = 16;
+}

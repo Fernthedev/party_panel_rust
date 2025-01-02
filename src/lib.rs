@@ -1,6 +1,7 @@
 #![feature(box_patterns, extend_one)]
 #![feature(generic_arg_infer)]
 
+use std::mem::MaybeUninit;
 use std::sync::{Arc, LazyLock};
 
 use bs_cordl::GlobalNamespace::{
@@ -22,6 +23,8 @@ use tracing::debug;
 
 mod web_context;
 
+mod proto;
+
 // Define a static runtime
 // We don't use tokio primitives here
 static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
@@ -32,7 +35,8 @@ static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
         .expect("Failed to create runtime")
 });
 
-static mut WEB_CONTEXT: OnceCell<Arc<RwLock<Option<web_context::WebContext>>>> = OnceCell::const_new();
+static mut WEB_CONTEXT: OnceCell<Arc<RwLock<Option<web_context::WebContext>>>> =
+    OnceCell::const_new();
 
 #[hook("", "StandardLevelScenesTransitionSetupDataSO", "Init")]
 fn StandardLevelScenesTransitionSetupDataSO_Init(
@@ -140,6 +144,12 @@ extern "C" fn late_load() {
 
     debug!("Setting up websocket");
     RUNTIME.block_on(async {
+        unsafe {
+            WEB_CONTEXT
+                .get_or_init(|| async { Arc::new(RwLock::const_new(None)) })
+                .await
+        };
+
         setup_client().await;
     });
 }
@@ -148,6 +158,13 @@ async fn setup_client() {
     let url = "ws://"; // TODO:
 
     let (ws_stream, _response) = connect_async(url).await.expect("Failed to connect");
+
+    let mut web_context_locked = unsafe { WEB_CONTEXT.get().unwrap().write() }.await;
+
+    let web_context = web_context_locked.insert(web_context::WebContext {
+        socket: todo!(),
+        songs: Default::default(),
+    });
 
     println!("WebSocket handshake has been successfully completed");
 }

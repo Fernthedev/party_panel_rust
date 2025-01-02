@@ -8,6 +8,8 @@ use qpm_cli::{
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    prost_build::compile_protos(&["src/items.proto", "src/packets.proto"], &["src/"])?;
+
     let manifest_path = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
 
     // change if qpm.shared.json modified
