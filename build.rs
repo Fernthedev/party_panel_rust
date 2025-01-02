@@ -31,7 +31,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     dependency::restore(&manifest_path, &shared_package, &resolved_deps, &mut repo)?;
 
     shared_package.write(manifest_path)?;
-    
+
     println!("cargo:rustc-link-search={}", lib_path.display());
     println!("cargo:rustc-link-lib=songcore");
 
@@ -70,26 +70,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .flag(format!(
             "-isystem{}",
             include_dir // baselib include
-            .join("libil2cpp")
-            .join("il2cpp")
-            .join("external")
-            .join("baselib")
-            .join("Include")
-            .display()
+                .join("libil2cpp")
+                .join("il2cpp")
+                .join("external")
+                .join("baselib")
+                .join("Include")
+                .display()
         ))
         .flag(format!(
             "-isystem{}",
             include_dir // baselib android include
-            .join("libil2cpp")
-            .join("il2cpp")
-            .join("external")
-            .join("baselib")
-            .join("Platforms")
-            .join("Android")
-            .join("Include")
-            .display()
+                .join("libil2cpp")
+                .join("il2cpp")
+                .join("external")
+                .join("baselib")
+                .join("Platforms")
+                .join("Android")
+                .join("Include")
+                .display()
         ))
-
         .include(include_dir.join("bs-cordl").join("include"))
         .include(include_dir)
         .compile("quest_compat");

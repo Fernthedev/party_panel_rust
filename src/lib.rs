@@ -1,24 +1,21 @@
 #![feature(box_patterns, extend_one)]
 #![feature(generic_arg_infer)]
 
-use std::ffi::{c_char, CString};
 use std::sync::LazyLock;
 
 use bs_cordl::GlobalNamespace::{
-    AudioClipAsyncLoader, BeatmapData, BeatmapDataLoader, BeatmapKey, BeatmapLevel,
-    BeatmapLevelPack, BeatmapLevelsEntitlementModel, BeatmapLevelsModel, ColorScheme,
-    EnvironmentsListModel, GameplayModifiers, IReadonlyBeatmapData, LevelCompletionResults,
-    NoteData, OverrideEnvironmentSettings, PlayerSpecificSettings, PracticeSettings,
-    RecordingToolManager_SetupData, SettingsManager, StandardLevelScenesTransitionSetupDataSO,
+    AudioClipAsyncLoader, BeatmapDataLoader, BeatmapKey, BeatmapLevel, BeatmapLevelPack,
+    BeatmapLevelsEntitlementModel, BeatmapLevelsModel, ColorScheme, EnvironmentsListModel,
+    GameplayModifiers, LevelCompletionResults, OverrideEnvironmentSettings, PlayerSpecificSettings,
+    PracticeSettings, RecordingToolManager_SetupData, SettingsManager,
+    StandardLevelScenesTransitionSetupDataSO,
 };
-use bs_cordl::UnityEngine::{self};
-use futures::{SinkExt, StreamExt};
+use futures::StreamExt;
 use quest_hook::hook;
 use quest_hook::libil2cpp::{Gc, Il2CppString};
 use scotland2_rs::scotland2_raw::CModInfo;
 use scotland2_rs::ModInfoBuf;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Runtime;
 use tokio_tungstenite::connect_async;
 use tracing::debug;
 
