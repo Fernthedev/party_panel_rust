@@ -163,6 +163,9 @@ async fn setup_client() {
 
     let web_context = web_context_locked.insert(web_context::WebContext {
         socket: todo!(),
+        flow: None,
+        get_status_cancellation_token_source: None,
+        level_cancellation_token_source: None,
         songs: Default::default(),
     });
 

@@ -1,15 +1,28 @@
 use std::collections::HashMap;
 
+use bs_cordl::{
+    GlobalNamespace::{
+        BeatmapCharacteristicSO, BeatmapDifficulty, BeatmapLevel, GameplayModifiers,
+        PracticeSettings, SoloFreePlayFlowCoordinator,
+    },
+    System::Threading::CancellationTokenSource,
+};
 use bytes::{Buf, Bytes, BytesMut};
 use futures::TryStreamExt;
 use prost::Message;
+use quest_hook::libil2cpp::Gc;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use tracing::info;
 
 use crate::proto::{
+    items::{
+        gameplay_modifiers::{EnabledObstacleType, EnergyType, SongSpeed},
+        PreviewBeatmapLevel,
+    },
     packets::{
         AllSongs, Command, DownloadSong, NowPlaying, NowPlayingUpdate, PlaySong, PreviewSong,
         SongList,
@@ -19,6 +32,9 @@ use crate::proto::{
 
 pub struct WebContext {
     pub songs: HashMap<SongId, SongData>,
+    pub level_cancellation_token_source: Option<Gc<CancellationTokenSource>>,
+    pub get_status_cancellation_token_source: Option<Gc<CancellationTokenSource>>,
+    pub flow: Option<Gc<SoloFreePlayFlowCoordinator>>,
     pub socket: TcpStream, //WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>,
 }
 
@@ -85,10 +101,10 @@ impl WebContext {
                 let command = Command::decode(data)?;
                 let command_type = CommandType::from(command.command_type);
                 match command_type {
-                    CommandType::CommandTypeHeartbeat => {
+                    CommandType::Heartbeat => {
                         // heartbeat
                     }
-                    CommandType::CommandTypeReturnToMenu => {
+                    CommandType::ReturnToMenu => {
                         // return to menu
                     }
                     _ => {}
@@ -131,5 +147,70 @@ impl WebContext {
         self.socket.write_all(&data).await?;
 
         Ok(())
+    }
+
+    pub fn convert_practice(
+        practice_settings: &PracticeSettings,
+    ) -> quest_hook::libil2cpp::Result<Gc<PracticeSettings>> {
+        PracticeSettings::New_f32_f32_2(0.0, practice_settings._songSpeedMul / 10000.0)
+    }
+
+    pub fn convert_modifiers(
+        mods: &GameplayModifiers,
+    ) -> quest_hook::libil2cpp::Result<Gc<GameplayModifiers>> {
+        GameplayModifiers::New_GameplayModifiers_EnergyType__cordl_bool__cordl_bool__cordl_bool_GameplayModifiers_EnabledObstacleType__cordl_bool__cordl_bool__cordl_bool__cordl_bool_GameplayModifiers_SongSpeed__cordl_bool__cordl_bool__cordl_bool__cordl_bool__cordl_bool1(
+            mods._energyType,
+            mods._noFailOn0Energy,
+            mods._instaFail,
+            mods._failOnSaberClash,
+            mods._enabledObstacleType,
+            mods._noBombs,
+            false,
+            mods._strictAngles,
+            mods._disappearingArrows,
+            mods._songSpeed,
+            mods._noBombs,
+            mods._ghostNotes,
+            mods._proMode,
+            mods._zenMode,
+            mods._smallCubes,
+        )
+    }
+
+    pub async fn play_song(
+        &mut self,
+        level: &PreviewBeatmapLevel,
+        characteristic: &BeatmapCharacteristicSO,
+        difficulty: BeatmapDifficulty,
+        packet: &PlaySong,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(flow) = &self.flow {
+            let loaded_level = self.get_level_from_preview(level).await?;
+            if let Some(beatmap_level) = loaded_level {
+                // Implementation for playing song would go here
+                // Note: Direct Unity calls would need to be handled differently in Rust
+            }
+        }
+        Ok(())
+    }
+
+    pub fn return_to_menu(&self) {
+        // Implementation would depend on how Unity scene management is handled
+    }
+
+    pub async fn has_dlc_level(&self, level_id: &str) -> Result<bool, Box<dyn std::error::Error>> {
+        if !level_id.starts_with("custom_level_") {
+            info!("{}", level_id);
+        }
+        // Implementation would depend on DLC checking mechanism
+        Ok(false)
+    }
+
+    pub async fn get_level_from_preview(
+        &self,
+        level: &PreviewBeatmapLevel,
+    ) -> Result<Option<BeatmapLevel>, Box<dyn std::error::Error>> {
+        // Implementation would depend on how beatmap levels are loaded
+        Ok(None)
     }
 }

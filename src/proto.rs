@@ -19,9 +19,9 @@ pub enum PacketType {
     AllSongs = 7,
 }
 pub enum CommandType {
-    CommandTypeUnspecified = 0,
-    CommandTypeHeartbeat = 1,
-    CommandTypeReturnToMenu = 2,
+    Unspecified = 0,
+    Heartbeat = 1,
+    ReturnToMenu = 2,
 }
 
 impl From<i32> for PacketType {
@@ -43,9 +43,9 @@ impl From<i32> for PacketType {
 impl From<i32> for CommandType {
     fn from(value: i32) -> Self {
         match value {
-            0 => CommandType::CommandTypeUnspecified,
-            1 => CommandType::CommandTypeHeartbeat,
-            2 => CommandType::CommandTypeReturnToMenu,
+            0 => CommandType::Unspecified,
+            1 => CommandType::Heartbeat,
+            2 => CommandType::ReturnToMenu,
             _ => panic!("Invalid command type"),
         }
     }

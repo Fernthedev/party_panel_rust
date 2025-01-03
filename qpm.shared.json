@@ -64,6 +64,25 @@
     },
     {
       "dependency": {
+        "id": "paper2_scotland2",
+        "versionRange": "=4.2.2",
+        "additionalData": {
+          "soLink": "https://github.com/Fernthedev/paperlog/releases/download/v4.2.2/libpaper2_scotland2.so",
+          "overrideSoName": "libpaper2_scotland2.so",
+          "modLink": "https://github.com/Fernthedev/paperlog/releases/download/v4.2.2/paper2_scotland2.qmod",
+          "branchName": "version/v4_2_2",
+          "compileOptions": {
+            "systemIncludes": [
+              "shared/utfcpp/source"
+            ]
+          },
+          "cmake": false
+        }
+      },
+      "version": "4.2.2"
+    },
+    {
+      "dependency": {
         "id": "libil2cpp",
         "versionRange": "=0.4.0",
         "additionalData": {
@@ -121,17 +140,17 @@
     {
       "dependency": {
         "id": "beatsaber-hook",
-        "versionRange": "=6.2.0",
+        "versionRange": "=6.3.0",
         "additionalData": {
-          "soLink": "https://github.com/QuestPackageManager/beatsaber-hook/releases/download/v6.2.0/libbeatsaber-hook.so",
-          "debugSoLink": "https://github.com/QuestPackageManager/beatsaber-hook/releases/download/v6.2.0/debug_libbeatsaber-hook.so",
+          "soLink": "https://github.com/QuestPackageManager/beatsaber-hook/releases/download/v6.3.0/libbeatsaber-hook.so",
+          "debugSoLink": "https://github.com/QuestPackageManager/beatsaber-hook/releases/download/v6.3.0/debug_libbeatsaber-hook.so",
           "overrideSoName": "libbeatsaber-hook.so",
-          "modLink": "https://github.com/QuestPackageManager/beatsaber-hook/releases/download/v6.2.0/beatsaber-hook.qmod",
-          "branchName": "version/v6_2_0",
+          "modLink": "https://github.com/QuestPackageManager/beatsaber-hook/releases/download/v6.3.0/beatsaber-hook.qmod",
+          "branchName": "version/v6_3_0",
           "cmake": true
         }
       },
-      "version": "6.2.0"
+      "version": "6.3.0"
     },
     {
       "dependency": {

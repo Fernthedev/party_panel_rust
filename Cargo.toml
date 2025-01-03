@@ -37,6 +37,8 @@ tracing = "*"
 bs_cordl = { git = "https://github.com/QuestPackageManager/bs-cordl-rust.git", tag = "v4000.0.0", features = [
     "StandardLevelScenesTransitionSetupDataSO",
     "BeatmapLevelPack",
+    "SoloFreePlayFlowCoordinator",
+    "System+Threading+CancellationTokenSource",
 ] }
 bytes = "1.9.0"
 
