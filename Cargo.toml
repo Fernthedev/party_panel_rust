@@ -34,11 +34,13 @@ futures = "0.3"
 # quest_hook = { path = "../quest-hook-rs", features = ["il2cpp_v31"]}
 tracing = "*"
 # bs_cordl = { path = "./codegen-rs", features = [
-bs_cordl = { git = "https://github.com/QuestPackageManager/bs-cordl-rust.git", tag = "v4000.0.0", features = [
+bs_cordl = { git = "https://github.com/QuestPackageManager/bs-cordl-rust.git", features = [
     "StandardLevelScenesTransitionSetupDataSO",
     "BeatmapLevelPack",
+    "MainFlowCoordinator",
     "SoloFreePlayFlowCoordinator",
     "System+Threading+CancellationTokenSource",
+    "UnityEngine+Resources",
 ] }
 bytes = "1.9.0"
 

@@ -185,7 +185,7 @@ dependencies = [
 [[package]]
 name = "bs_cordl"
 version = "0.1.0"
-source = "git+https://github.com/QuestPackageManager/bs-cordl-rust.git?tag=v4000.0.0#3c222fdb6bd4cf2ee0430aa44fb91c37d9a47c84"
+source = "git+https://github.com/QuestPackageManager/bs-cordl-rust.git#684ebdabb9e9b2f5dd9a6568bb23ee9a558b45e7"
 dependencies = [
  "quest_hook",
 ]
@@ -231,9 +231,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.6"
+version = "1.2.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d6dbb628b8f8555f86d0323c2eb39e3ec81901f4b83e091db8a6a76d316a333"
+checksum = "a012a0df96dd6d06ba9a1b29d6402d1a5d77c6befd2566afdc26e10603dc93d7"
 dependencies = [
  "jobserver",
  "libc",
@@ -2147,12 +2147,13 @@ dependencies = [
 
 [[package]]
 name = "tempfile"
-version = "3.14.0"
+version = "3.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28cce251fcbc87fac86a866eeb0d6c2d536fc16d06f184bb61aeae11aa4cee0c"
+checksum = "9a8a559c81686f576e8cd0290cd2a24a2a9ad80c98b3478856500fcbd7acd704"
 dependencies = [
  "cfg-if",
  "fastrand",
+ "getrandom",
  "once_cell",
  "rustix",
  "windows-sys 0.59.0",

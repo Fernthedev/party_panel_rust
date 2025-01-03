@@ -3,9 +3,10 @@ use std::collections::HashMap;
 use bs_cordl::{
     GlobalNamespace::{
         BeatmapCharacteristicSO, BeatmapDifficulty, BeatmapLevel, GameplayModifiers,
-        PracticeSettings, SoloFreePlayFlowCoordinator,
+        MainFlowCoordinator, PracticeSettings, SoloFreePlayFlowCoordinator,
     },
     System::Threading::CancellationTokenSource,
+    UnityEngine::Resources,
 };
 use bytes::{Buf, Bytes, BytesMut};
 use futures::TryStreamExt;
@@ -191,6 +192,59 @@ impl WebContext {
                 // Note: Direct Unity calls would need to be handled differently in Rust
             }
         }
+
+        let flow: Gc<SoloFreePlayFlowCoordinator> =
+            Resources::FindObjectsOfTypeAll_1::<Gc<MainFlowCoordinator>>()?
+                .as_slice()
+                .first()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                ._soloFreePlayFlowCoordinator
+                .into();
+        self.flow = Some(flow);
+        // Action<IBeatmapLevel> SongLoaded = (loadedLevel) =>
+        // {
+        //     MenuTransitionsHelper _menuSceneSetupData = Resources.FindObjectsOfTypeAll<MenuTransitionsHelper>().First();
+        //     IDifficultyBeatmap diffbeatmap = loadedLevel.beatmapLevelData.GetDifficultyBeatmap(characteristic, difficulty);
+        //     GameplaySetupViewController gameplaySetupViewController = (GameplaySetupViewController)typeof(SinglePlayerLevelSelectionFlowCoordinator).GetField("_gameplaySetupViewController", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(flow);
+        //     OverrideEnvironmentSettings environmentSettings = gameplaySetupViewController.environmentOverrideSettings;
+        //     ColorScheme scheme = gameplaySetupViewController.colorSchemesSettings.GetSelectedColorScheme();
+        //     PlayerSpecificSettings settings = gameplaySetupViewController.playerSettings;
+        //     //TODO: re add modifier customizability
+
+        //     GameplayModifiers modifiers = ConvertModifiers(packet.gameplayModifiers);
+        //     _menuSceneSetupData.StartStandardLevel(
+        //         "Solo",
+        //         diffbeatmap,
+        //         diffbeatmap.level,
+        //         environmentSettings,
+        //         scheme,
+        //         modifiers,
+        //         settings,
+        //         null,
+        //         "Menu",
+        //         false,
+        //         false,
+        //         null,
+        //         new Action<StandardLevelScenesTransitionSetupDataSO, LevelCompletionResults>((StandardLevelScenesTransitionSetupDataSO q, LevelCompletionResults r) => { }),
+        //         new Action<LevelScenesTransitionSetupDataSO, LevelCompletionResults>((LevelScenesTransitionSetupDataSO q, LevelCompletionResults r) => { })
+        //     );
+        // };
+        // HMMainThreadDispatcher.instance.Enqueue(() =>
+        // {
+        //     NoTransitionsButton button = Resources.FindObjectsOfTypeAll<NoTransitionsButton>().Where(x => x != null && x.gameObject.name == "SoloButton").FirstOrDefault();
+        //     button.onClick.Invoke();
+        // });
+        // if (true)
+        // {
+        //     var result = await GetLevelFromPreview(level);
+        //     if ( !(result?.isError == true))
+        //     {
+        //         SongLoaded(result?.beatmapLevel);
+        //         return;
+        //     }
+        // }
         Ok(())
     }
 
