@@ -2,16 +2,18 @@ use std::collections::HashMap;
 
 use bs_cordl::{
     GlobalNamespace::{
-        BeatmapCharacteristicSO, BeatmapDifficulty, BeatmapLevel, GameplayModifiers,
-        MainFlowCoordinator, PracticeSettings, SoloFreePlayFlowCoordinator,
+        BeatmapCharacteristicSO, BeatmapDifficulty, BeatmapKey, BeatmapLevel, GameplayModifiers,
+        GameplayModifiers_EnabledObstacleType, GameplayModifiers_EnergyType,
+        GameplayModifiers_SongSpeed, MainFlowCoordinator, MenuTransitionsHelper, PracticeSettings,
+        RecordingToolManager_SetupData, SoloFreePlayFlowCoordinator,
     },
-    System::Threading::CancellationTokenSource,
+    System::{Nullable_1, Threading::CancellationTokenSource},
     UnityEngine::Resources,
 };
 use bytes::{Buf, Bytes, BytesMut};
 use futures::TryStreamExt;
 use prost::Message;
-use quest_hook::libil2cpp::Gc;
+use quest_hook::libil2cpp::{Gc, Il2CppString};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
@@ -20,6 +22,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tracing::info;
 
 use crate::proto::{
+    self,
     items::{
         gameplay_modifiers::{EnabledObstacleType, EnergyType, SongSpeed},
         PreviewBeatmapLevel,
@@ -157,52 +160,131 @@ impl WebContext {
     }
 
     pub fn convert_modifiers(
-        mods: &GameplayModifiers,
+        mods: &proto::items::GameplayModifiers,
     ) -> quest_hook::libil2cpp::Result<Gc<GameplayModifiers>> {
         GameplayModifiers::New_GameplayModifiers_EnergyType__cordl_bool__cordl_bool__cordl_bool_GameplayModifiers_EnabledObstacleType__cordl_bool__cordl_bool__cordl_bool__cordl_bool_GameplayModifiers_SongSpeed__cordl_bool__cordl_bool__cordl_bool__cordl_bool__cordl_bool1(
-            mods._energyType,
-            mods._noFailOn0Energy,
-            mods._instaFail,
-            mods._failOnSaberClash,
-            mods._enabledObstacleType,
-            mods._noBombs,
+            energy_type_from_i32(mods.energy_type),
+            mods.no_fail_on_0_energy,
+            mods.insta_fail,
+            mods.fail_on_saber_clash,
+            obstacle_type_from_i32(mods.enabled_obstacle_type),
+            mods.no_bombs,
             false,
-            mods._strictAngles,
-            mods._disappearingArrows,
-            mods._songSpeed,
-            mods._noBombs,
-            mods._ghostNotes,
-            mods._proMode,
-            mods._zenMode,
-            mods._smallCubes,
+            mods.strict_angles,
+            mods.disappearing_arrows,
+            song_speed_from_i32(mods.song_speed),
+            mods.no_bombs,
+            mods.ghost_notes,
+            mods.pro_mode,
+            mods.zen_mode,
+            mods.small_cubes,
         )
     }
 
     pub async fn play_song(
         &mut self,
         level: &PreviewBeatmapLevel,
-        characteristic: &BeatmapCharacteristicSO,
+        characteristic: Gc<BeatmapCharacteristicSO>,
         difficulty: BeatmapDifficulty,
         packet: &PlaySong,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(flow) = &self.flow {
-            let loaded_level = self.get_level_from_preview(level).await?;
-            if let Some(beatmap_level) = loaded_level {
-                // Implementation for playing song would go here
-                // Note: Direct Unity calls would need to be handled differently in Rust
-            }
-        }
+        self.flow = Resources::FindObjectsOfTypeAll_1::<Gc<MainFlowCoordinator>>()?
+            .as_slice()
+            .first()
+            // simplify
+            .and_then(|flow| flow.as_ref())
+            // map
+            .map(|flow| flow._soloFreePlayFlowCoordinator.into());
 
-        let flow: Gc<SoloFreePlayFlowCoordinator> =
-            Resources::FindObjectsOfTypeAll_1::<Gc<MainFlowCoordinator>>()?
+        let Some(flow) = &self.flow else {
+            return Ok(());
+        };
+
+        let loaded_level = self.get_level_from_preview(level).await?;
+        let Some(beatmap_level) = loaded_level else {
+            return Ok(());
+        };
+
+        //        MenuTransitionsHelper _menuSceneSetupData = Resources.FindObjectsOfTypeAll<MenuTransitionsHelper>().First();
+        // IDifficultyBeatmap diffbeatmap = loadedLevel.beatmapLevelData.GetDifficultyBeatmap(characteristic, difficulty);
+        // GameplaySetupViewController gameplaySetupViewController = (GameplaySetupViewController)typeof(SinglePlayerLevelSelectionFlowCoordinator).GetField("_gameplaySetupViewController", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(flow);
+        // OverrideEnvironmentSettings environmentSettings = gameplaySetupViewController.environmentOverrideSettings;
+        // ColorScheme scheme = gameplaySetupViewController.colorSchemesSettings.GetSelectedColorScheme();
+        // PlayerSpecificSettings settings = gameplaySetupViewController.playerSettings;
+        // //TODO: re add modifier customizability
+
+        // GameplayModifiers modifiers = ConvertModifiers(packet.gameplayModifiers);
+        // _menuSceneSetupData.StartStandardLevel(
+        //     "Solo",
+        //     diffbeatmap,
+        //     diffbeatmap.level,
+        //     environmentSettings,
+        //     scheme,
+        //     modifiers,
+        //     settings,
+        //     null,
+        //     "Menu",
+        //     false,
+        //     false,
+        //     null,
+        //     new Action<StandardLevelScenesTransitionSetupDataSO, LevelCompletionResults>((StandardLevelScenesTransitionSetupDataSO q, LevelCompletionResults r) => { }),
+        //     new Action<LevelScenesTransitionSetupDataSO, LevelCompletionResults>((LevelScenesTransitionSetupDataSO q, LevelCompletionResults r) => { })
+        // );
+        let menu_scene_setup_data =
+            Resources::FindObjectsOfTypeAll_1::<Gc<MenuTransitionsHelper>>()?
                 .as_slice()
                 .first()
-                .unwrap()
-                .as_ref()
-                .unwrap()
-                ._soloFreePlayFlowCoordinator
-                .into();
-        self.flow = Some(flow);
+                .and_then(|menu| menu.as_ref())
+                .ok_or("No MenuTransitionsHelper found")?;
+
+        let diff_beatmap = beatmap_level.GetDifficultyBeatmapData(characteristic, difficulty)?;
+
+        let key = BeatmapKey {
+            beatmapCharacteristic: characteristic.get_pointer_mut(),
+            difficulty,
+            levelId: beatmap_level.levelID,
+        };
+        let gameplay_setup_view_controller: Gc<
+            bs_cordl::GlobalNamespace::GameplaySetupViewController,
+        > = flow._gameplaySetupViewController.into();
+        let environment_settings =
+            gameplay_setup_view_controller.get_environmentOverrideSettings()?;
+        let scheme = gameplay_setup_view_controller
+            .get_colorSchemesSettings()?
+            .GetSelectedColorScheme()?;
+        let settings = gameplay_setup_view_controller.get_playerSettings()?;
+
+        let modifiers = Self::convert_modifiers(packet.gameplay_modifiers.as_ref().unwrap())?;
+
+        menu_scene_setup_data.StartStandardLevel_OverrideEnvironmentSettings_ColorScheme__cordl_bool_ColorScheme_GameplayModifiers_PlayerSpecificSettings_PracticeSettings_EnvironmentsListModel_Il2CppString__cordl_bool_Action_Action_1_Action_2_Nullable_1_0(
+            Il2CppString::new("Solo"),
+            key,
+            beatmap_level,
+            environment_settings,
+            scheme,
+            Gc::null(),
+            Gc::null(),
+            modifiers,
+            settings,
+            false,
+            Gc::null(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Nullable_1{
+                hasValue: false,
+                value: RecordingToolManager_SetupData{
+                profileSong: false,
+                runAutopilot: false,
+            },
+                __cordl_phantom_T: std::marker::PhantomData,
+            } ,
+        )?;
+
         // Action<IBeatmapLevel> SongLoaded = (loadedLevel) =>
         // {
         //     MenuTransitionsHelper _menuSceneSetupData = Resources.FindObjectsOfTypeAll<MenuTransitionsHelper>().First();
@@ -263,8 +345,35 @@ impl WebContext {
     pub async fn get_level_from_preview(
         &self,
         level: &PreviewBeatmapLevel,
-    ) -> Result<Option<BeatmapLevel>, Box<dyn std::error::Error>> {
+    ) -> Result<Option<Gc<BeatmapLevel>>, Box<dyn std::error::Error>> {
         // Implementation would depend on how beatmap levels are loaded
         Ok(None)
+    }
+}
+
+fn energy_type_from_i32(value: i32) -> GameplayModifiers_EnergyType {
+    match value {
+        0 => GameplayModifiers_EnergyType::Bar,
+        1 => GameplayModifiers_EnergyType::Battery,
+        _ => GameplayModifiers_EnergyType::Bar,
+    }
+}
+
+fn obstacle_type_from_i32(value: i32) -> GameplayModifiers_EnabledObstacleType {
+    match value {
+        0 => GameplayModifiers_EnabledObstacleType::All,
+        1 => GameplayModifiers_EnabledObstacleType::FullHeightOnly,
+        2 => GameplayModifiers_EnabledObstacleType::NoObstacles,
+        _ => GameplayModifiers_EnabledObstacleType::All,
+    }
+}
+
+fn song_speed_from_i32(value: i32) -> GameplayModifiers_SongSpeed {
+    match value {
+        0 => GameplayModifiers_SongSpeed::Normal,
+        1 => GameplayModifiers_SongSpeed::Faster,
+        2 => GameplayModifiers_SongSpeed::Slower,
+        3 => GameplayModifiers_SongSpeed::SuperFast,
+        _ => GameplayModifiers_SongSpeed::Normal,
     }
 }

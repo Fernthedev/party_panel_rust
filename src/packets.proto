@@ -19,7 +19,7 @@ message PlaySong {
     string level_id = 1;
     string difficulty = 2;
     partypanel.items.Characteristic characteristic = 3;
-    partypanel.items.GameplayModifiers gameplay_modifiers = 4;
+    partypanel.items.GameplayModifiers gameplay_modifiers = 4; // nonnull
 }
 
 // NowPlayingUpdate message
