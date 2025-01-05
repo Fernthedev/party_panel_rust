@@ -9,6 +9,7 @@ use bs_cordl::{
     },
     System::{Nullable_1, Threading::CancellationTokenSource},
     UnityEngine::Resources,
+    HMUI::NoTransitionsButton,
 };
 use bytes::{Buf, Bytes, BytesMut};
 use futures::TryStreamExt;
@@ -21,17 +22,20 @@ use tokio::{
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tracing::info;
 
-use crate::proto::{
-    self,
-    items::{
-        gameplay_modifiers::{EnabledObstacleType, EnergyType, SongSpeed},
-        PreviewBeatmapLevel,
+use crate::{
+    party_panel_run_on_main_thread,
+    proto::{
+        self,
+        items::{
+            gameplay_modifiers::{EnabledObstacleType, EnergyType, SongSpeed},
+            PreviewBeatmapLevel,
+        },
+        packets::{
+            AllSongs, Command, DownloadSong, NowPlaying, NowPlayingUpdate, PlaySong, PreviewSong,
+            SongList,
+        },
+        CommandType, PacketType, PartyPacket,
     },
-    packets::{
-        AllSongs, Command, DownloadSong, NowPlaying, NowPlayingUpdate, PlaySong, PreviewSong,
-        SongList,
-    },
-    CommandType, PacketType, PartyPacket,
 };
 
 pub struct WebContext {
@@ -191,62 +195,54 @@ impl WebContext {
         self.flow = Resources::FindObjectsOfTypeAll_1::<Gc<MainFlowCoordinator>>()?
             .as_slice()
             .first()
-            // simplify
-            .and_then(|flow| flow.as_ref())
-            // map
-            .map(|flow| flow._soloFreePlayFlowCoordinator.into());
+            .map(|flow| flow._soloFreePlayFlowCoordinator);
 
         let Some(flow) = &self.flow else {
             return Ok(());
         };
+
+        extern "C" fn click_solo_button(_: *mut std::ffi::c_void) {
+            let mut solo_button = Resources::FindObjectsOfTypeAll_1::<Gc<NoTransitionsButton>>()
+                .unwrap()
+                .as_slice()
+                .iter()
+                .cloned()
+                .find(|x| {
+                    !x.is_null()
+                        && x
+                            .clone()
+                            .get_gameObject()
+                            .unwrap()
+                            .get_name()
+                            .unwrap()
+                            .to_string_lossy()
+                            == "SoloButton"
+                })
+                .expect("No solo button found");
+            solo_button.get_onClick().unwrap().Invoke().unwrap();
+        }
+
+        unsafe { party_panel_run_on_main_thread(click_solo_button, std::ptr::null_mut()) }
 
         let loaded_level = self.get_level_from_preview(level).await?;
         let Some(beatmap_level) = loaded_level else {
             return Ok(());
         };
 
-        //        MenuTransitionsHelper _menuSceneSetupData = Resources.FindObjectsOfTypeAll<MenuTransitionsHelper>().First();
-        // IDifficultyBeatmap diffbeatmap = loadedLevel.beatmapLevelData.GetDifficultyBeatmap(characteristic, difficulty);
-        // GameplaySetupViewController gameplaySetupViewController = (GameplaySetupViewController)typeof(SinglePlayerLevelSelectionFlowCoordinator).GetField("_gameplaySetupViewController", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(flow);
-        // OverrideEnvironmentSettings environmentSettings = gameplaySetupViewController.environmentOverrideSettings;
-        // ColorScheme scheme = gameplaySetupViewController.colorSchemesSettings.GetSelectedColorScheme();
-        // PlayerSpecificSettings settings = gameplaySetupViewController.playerSettings;
-        // //TODO: re add modifier customizability
 
-        // GameplayModifiers modifiers = ConvertModifiers(packet.gameplayModifiers);
-        // _menuSceneSetupData.StartStandardLevel(
-        //     "Solo",
-        //     diffbeatmap,
-        //     diffbeatmap.level,
-        //     environmentSettings,
-        //     scheme,
-        //     modifiers,
-        //     settings,
-        //     null,
-        //     "Menu",
-        //     false,
-        //     false,
-        //     null,
-        //     new Action<StandardLevelScenesTransitionSetupDataSO, LevelCompletionResults>((StandardLevelScenesTransitionSetupDataSO q, LevelCompletionResults r) => { }),
-        //     new Action<LevelScenesTransitionSetupDataSO, LevelCompletionResults>((LevelScenesTransitionSetupDataSO q, LevelCompletionResults r) => { })
-        // );
-        let menu_scene_setup_data =
+        let mut menu_scene_setup_data =
             Resources::FindObjectsOfTypeAll_1::<Gc<MenuTransitionsHelper>>()?
                 .as_slice()
                 .first()
-                .and_then(|menu| menu.as_ref())
+                .copied()
                 .ok_or("No MenuTransitionsHelper found")?;
 
-        let diff_beatmap = beatmap_level.GetDifficultyBeatmapData(characteristic, difficulty)?;
-
         let key = BeatmapKey {
-            beatmapCharacteristic: characteristic.get_pointer_mut(),
+            beatmapCharacteristic: characteristic,
             difficulty,
             levelId: beatmap_level.levelID,
         };
-        let gameplay_setup_view_controller: Gc<
-            bs_cordl::GlobalNamespace::GameplaySetupViewController,
-        > = flow._gameplaySetupViewController.into();
+        let mut gameplay_setup_view_controller = flow._gameplaySetupViewController;
         let environment_settings =
             gameplay_setup_view_controller.get_environmentOverrideSettings()?;
         let scheme = gameplay_setup_view_controller
@@ -262,11 +258,11 @@ impl WebContext {
             beatmap_level,
             environment_settings,
             scheme,
-            Gc::null(),
+            false,
             Gc::null(),
             modifiers,
             settings,
-            false,
+            Gc::null(),
             Gc::null(),
             Default::default(),
             Default::default(),
@@ -275,14 +271,7 @@ impl WebContext {
             Default::default(),
             Default::default(),
             Default::default(),
-            Nullable_1{
-                hasValue: false,
-                value: RecordingToolManager_SetupData{
-                profileSong: false,
-                runAutopilot: false,
-            },
-                __cordl_phantom_T: std::marker::PhantomData,
-            } ,
+            Nullable_1::default() ,
         )?;
 
         // Action<IBeatmapLevel> SongLoaded = (loadedLevel) =>

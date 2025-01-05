@@ -128,6 +128,7 @@ extern "C" fn party_panel_on_song_load(levels: *const *const BeatmapLevelPack, l
 
 extern "C" {
     fn quest_compat_init();
+    pub fn party_panel_run_on_main_thread(func: extern "C" fn(*mut std::ffi::c_void), arg: *mut std::ffi::c_void);
 }
 
 #[no_mangle]
