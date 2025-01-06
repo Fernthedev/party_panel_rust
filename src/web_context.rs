@@ -1,13 +1,18 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, future::Future};
 
 use bs_cordl::{
     GlobalNamespace::{
-        BeatmapCharacteristicSO, BeatmapDifficulty, BeatmapKey, BeatmapLevel, GameplayModifiers,
+        AdditionalContentModel, BeatmapCharacteristicSO, BeatmapDifficulty, BeatmapKey,
+        BeatmapLevel, BeatmapLevelsModel, EntitlementStatus, GameplayModifiers,
         GameplayModifiers_EnabledObstacleType, GameplayModifiers_EnergyType,
         GameplayModifiers_SongSpeed, MainFlowCoordinator, MenuTransitionsHelper, PracticeSettings,
         RecordingToolManager_SetupData, SoloFreePlayFlowCoordinator,
+        StandardLevelReturnToMenuController,
     },
-    System::{Nullable_1, Threading::CancellationTokenSource},
+    System::{
+        Nullable_1,
+        Threading::{CancellationTokenSource, Tasks::Task_1},
+    },
     UnityEngine::Resources,
     HMUI::NoTransitionsButton,
 };
@@ -23,8 +28,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tracing::info;
 
 use crate::{
-    party_panel_run_on_main_thread,
-    proto::{
+    async_utils::Il2CPPFutureAwaitable, party_panel_run_on_main_thread, proto::{
         self,
         items::{
             gameplay_modifiers::{EnabledObstacleType, EnergyType, SongSpeed},
@@ -35,7 +39,7 @@ use crate::{
             SongList,
         },
         CommandType, PacketType, PartyPacket,
-    },
+    }
 };
 
 pub struct WebContext {
@@ -197,7 +201,7 @@ impl WebContext {
             .first()
             .map(|flow| flow._soloFreePlayFlowCoordinator);
 
-        let Some(flow) = &self.flow else {
+        let Some(flow) = self.flow else {
             return Ok(());
         };
 
@@ -209,8 +213,7 @@ impl WebContext {
                 .cloned()
                 .find(|x| {
                     !x.is_null()
-                        && x
-                            .clone()
+                        && x.clone()
                             .get_gameObject()
                             .unwrap()
                             .get_name()
@@ -224,11 +227,10 @@ impl WebContext {
 
         unsafe { party_panel_run_on_main_thread(click_solo_button, std::ptr::null_mut()) }
 
-        let loaded_level = self.get_level_from_preview(level).await?;
+        let loaded_level = self.get_level_from_preview(level)?;
         let Some(beatmap_level) = loaded_level else {
             return Ok(());
         };
-
 
         let mut menu_scene_setup_data =
             Resources::FindObjectsOfTypeAll_1::<Gc<MenuTransitionsHelper>>()?
@@ -320,23 +322,130 @@ impl WebContext {
     }
 
     pub fn return_to_menu(&self) {
-        // Implementation would depend on how Unity scene management is handled
+        extern "C" fn return_to_main_menu_callback(_: *mut std::ffi::c_void) {
+            let Ok(controllers) =
+                Resources::FindObjectsOfTypeAll_1::<Gc<StandardLevelReturnToMenuController>>()
+            else {
+                return;
+            };
+            let Some(mut controller) = controllers.as_slice().first().cloned() else {
+                return;
+            };
+            let _ = controller.ReturnToMenu();
+        }
+
+        unsafe {
+            party_panel_run_on_main_thread(return_to_main_menu_callback, std::ptr::null_mut());
+        }
     }
 
-    pub async fn has_dlc_level(&self, level_id: &str) -> Result<bool, Box<dyn std::error::Error>> {
+    // public static async Task<bool> HasDLCLevel(string levelId, AdditionalContentModel additionalContentModel = null)
+    // {
+    //     if(!levelId.StartsWith("custom_level_"))
+    //     {
+    //         Logger.Info(levelId);
+    //     }
+    //     additionalContentModel = additionalContentModel ?? Resources.FindObjectsOfTypeAll<AdditionalContentModel>().FirstOrDefault();
+
+    //     if (additionalContentModel != null)
+    //     {
+    //         getStatusCancellationTokenSource?.Cancel();
+    //         getStatusCancellationTokenSource = new CancellationTokenSource();
+
+    //         var token = getStatusCancellationTokenSource.Token;
+    //         return await additionalContentModel.GetLevelEntitlementStatusAsync(levelId, token) == AdditionalContentModel.EntitlementStatus.Owned;
+    //     }
+
+    //     return false;
+    // }
+    pub async fn has_dlc_level(
+        &mut self,
+        level_id: &str,
+        additional_content_model: Option<Gc<AdditionalContentModel>>,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         if !level_id.starts_with("custom_level_") {
             info!("{}", level_id);
         }
-        // Implementation would depend on DLC checking mechanism
-        Ok(false)
+
+        let model = additional_content_model.or_else(|| {
+            Resources::FindObjectsOfTypeAll_1::<Gc<AdditionalContentModel>>()
+                .ok()
+                .and_then(|models| models.as_slice().first().cloned())
+        });
+
+        let Some(mut model) = model else {
+            return Ok(false);
+        };
+
+        if let Some(mut source) = self.get_status_cancellation_token_source {
+            source.Cancel_0()?;
+        }
+        self.get_status_cancellation_token_source = Some(CancellationTokenSource::New_0()?);
+
+        let token = self
+            .get_status_cancellation_token_source
+            .unwrap()
+            .get_Token()?;
+
+        let status = model
+            .IAdditionalContentEntitlementModel_GetLevelEntitlementStatusAsync(
+                Il2CppString::new(level_id),
+                token,
+            )?
+            .into_awaitable()
+            .await?;
+
+        Ok(status == EntitlementStatus::Owned)
     }
 
-    pub async fn get_level_from_preview(
-        &self,
+    // public static async Task<BeatmapLevelsModel.GetBeatmapLevelResult?> GetLevelFromPreview(IPreviewBeatmapLevel level, BeatmapLevelsModel beatmapLevelsModel = null)
+    // {
+    //     beatmapLevelsModel = beatmapLevelsModel ?? Resources.FindObjectsOfTypeAll<BeatmapLevelsModel>().FirstOrDefault();
+
+    //     if (beatmapLevelsModel != null)
+    //     {
+    //         getLevelCancellationTokenSource?.Cancel();
+    //         getLevelCancellationTokenSource = new CancellationTokenSource();
+
+    //         var token = getLevelCancellationTokenSource.Token;
+
+    //         BeatmapLevelsModel.GetBeatmapLevelResult? result = null;
+    //         try
+    //         {
+    //             result = await beatmapLevelsModel.GetBeatmapLevelAsync(level.levelID, token);
+    //         }
+    //         catch (OperationCanceledException) { }
+    //         if (result?.isError == true || result?.beatmapLevel == null)
+    //         {
+    //             Logger.Error("Failed to load Level");
+    //             return null; //Null out entirely in case of error
+    //         }
+    //         return result;
+    //     }
+    //     return null;
+    // }
+    pub fn get_level_from_preview(
+        &mut self,
         level: &PreviewBeatmapLevel,
     ) -> Result<Option<Gc<BeatmapLevel>>, Box<dyn std::error::Error>> {
-        // Implementation would depend on how beatmap levels are loaded
-        Ok(None)
+        let beatmap_levels_model = Resources::FindObjectsOfTypeAll_1::<Gc<BeatmapLevelsModel>>()?
+            .as_slice()
+            .first()
+            .cloned();
+
+        let Some(mut beatmap_levels_model) = beatmap_levels_model else {
+            return Ok(None);
+        };
+
+        let result = beatmap_levels_model.GetBeatmapLevel(Il2CppString::new(&level.level_id));
+
+        match result {
+            Ok(level) => Ok(Some(level)),
+            _ => {
+                info!("Failed to load Level");
+                Ok(None)
+            }
+        }
     }
 }
 

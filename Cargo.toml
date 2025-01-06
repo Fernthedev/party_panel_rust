@@ -44,6 +44,8 @@ bs_cordl = { git = "https://github.com/QuestPackageManager/bs-cordl-rust.git", f
     "SoloFreePlayFlowCoordinator",
     "System+Threading+CancellationTokenSource",
     "UnityEngine+Resources",
+    "AdditionalContentModel",
+    "StandardLevelReturnToMenuController",
     "MainThreadDispatcher"
 ] }
 bytes = "1.9.0"
