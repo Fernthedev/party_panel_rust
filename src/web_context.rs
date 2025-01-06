@@ -1,4 +1,4 @@
-use std::{collections::HashMap, future::Future};
+use std::collections::HashMap;
 
 use bs_cordl::{
     GlobalNamespace::{
@@ -6,13 +6,9 @@ use bs_cordl::{
         BeatmapLevel, BeatmapLevelsModel, EntitlementStatus, GameplayModifiers,
         GameplayModifiers_EnabledObstacleType, GameplayModifiers_EnergyType,
         GameplayModifiers_SongSpeed, MainFlowCoordinator, MenuTransitionsHelper, PracticeSettings,
-        RecordingToolManager_SetupData, SoloFreePlayFlowCoordinator,
-        StandardLevelReturnToMenuController,
+        SoloFreePlayFlowCoordinator, StandardLevelReturnToMenuController,
     },
-    System::{
-        Nullable_1,
-        Threading::{CancellationTokenSource, Tasks::Task_1},
-    },
+    System::{Nullable_1, Threading::CancellationTokenSource},
     UnityEngine::Resources,
     HMUI::NoTransitionsButton,
 };
@@ -24,22 +20,20 @@ use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tracing::info;
 
 use crate::{
-    async_utils::Il2CPPFutureAwaitable, party_panel_run_on_main_thread, proto::{
+    async_utils::Il2CPPFutureAwaitable,
+    party_panel_run_on_main_thread,
+    proto::{
         self,
-        items::{
-            gameplay_modifiers::{EnabledObstacleType, EnergyType, SongSpeed},
-            PreviewBeatmapLevel,
-        },
+        items::PreviewBeatmapLevel,
         packets::{
             AllSongs, Command, DownloadSong, NowPlaying, NowPlayingUpdate, PlaySong, PreviewSong,
             SongList,
         },
         CommandType, PacketType, PartyPacket,
-    }
+    },
 };
 
 pub struct WebContext {

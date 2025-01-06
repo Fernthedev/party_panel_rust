@@ -3,7 +3,6 @@ use std::future::Future;
 use bs_cordl::System::Threading::Tasks::Task_1;
 use quest_hook::libil2cpp::Gc;
 
-
 pub trait Il2CPPFutureAwaitable {
     type Output;
 

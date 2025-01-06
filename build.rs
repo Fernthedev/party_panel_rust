@@ -34,8 +34,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     shared_package.write(&manifest_path)?;
 
-
-
     // cbindgen::Builder::new()
     //   .with_crate(&manifest_path)
     //   .generate()
@@ -62,7 +60,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // bindings
     //     .write_to_file(out_path.join("quest_compat.rs"))
     //     .expect("Couldn't write bindings!");
-
 
     println!("cargo:rustc-link-search={}", lib_path.display());
     println!("cargo:rustc-link-lib=songcore");

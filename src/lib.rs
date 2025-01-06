@@ -1,8 +1,9 @@
 #![feature(box_patterns, extend_one)]
 #![feature(generic_arg_infer)]
+#![feature(lock_value_accessors)]
 
-use std::mem::MaybeUninit;
-use std::sync::{Arc, LazyLock};
+use std::sync::{LazyLock, Mutex};
+use std::time::Duration;
 
 use bs_cordl::GlobalNamespace::{
     AudioClipAsyncLoader, BeatmapDataLoader, BeatmapKey, BeatmapLevel, BeatmapLevelPack,
@@ -12,17 +13,19 @@ use bs_cordl::GlobalNamespace::{
     StandardLevelScenesTransitionSetupDataSO,
 };
 use futures::StreamExt;
+use proto::packets::NowPlayingUpdate;
 use quest_hook::hook;
 use quest_hook::libil2cpp::{Gc, Il2CppString};
 use scotland2_rs::scotland2_raw::CModInfo;
 use scotland2_rs::ModInfoBuf;
 use tokio::runtime::Runtime;
-use tokio::sync::{OnceCell, RwLock};
+use tokio::sync::RwLock;
 use tokio_tungstenite::connect_async;
 use tracing::debug;
 
 mod web_context;
 
+mod async_utils;
 mod proto;
 
 // Define a static runtime
@@ -35,8 +38,40 @@ static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
         .expect("Failed to create runtime")
 });
 
-static mut WEB_CONTEXT: OnceCell<Arc<RwLock<Option<web_context::WebContext>>>> =
-    OnceCell::const_new();
+static mut HEARTBEAT_HANDLE: Mutex<Option<tokio::task::JoinHandle<()>>> = Mutex::new(None);
+
+static mut WEB_CONTEXT: RwLock<Option<web_context::WebContext>> = RwLock::const_new(None);
+
+async fn heartbeat_timer() -> Result<(), Box<dyn std::error::Error>> {
+    let mut interval = tokio::time::interval(Duration::from_secs(1));
+    loop {
+        interval.tick().await;
+        // Assuming we have similar data structures in Rust
+        // This is a placeholder implementation - you'll need to adapt it
+        // to your actual data structures
+        let Some(context) = (unsafe { WEB_CONTEXT.write().await }).as_mut() else {
+            return Ok(());
+        };
+
+        let packet = NowPlayingUpdate {
+            score: todo!(),
+            accuracy: todo!(),
+            elapsed: todo!(),
+            total_time: todo!(),
+        };
+
+        context.write_packet(packet).await?;
+    }
+}
+
+// You might want to start the timer in your setup_client function:
+// tokio::spawn(async {
+//     let mut interval = tokio::time::interval(Duration::from_secs(1));
+//     loop {
+//         interval.tick().await;
+//         heartbeat_timer_elapsed().await;
+//     }
+// });
 
 #[hook("", "StandardLevelScenesTransitionSetupDataSO", "Init")]
 fn StandardLevelScenesTransitionSetupDataSO_Init(
@@ -85,14 +120,27 @@ fn StandardLevelScenesTransitionSetupDataSO_Init(
         start_paused,
         recording_tool_data,
     );
+
+    let handle = RUNTIME.spawn(async {
+        heartbeat_timer().await.unwrap();
+    });
+
+    unsafe {
+        HEARTBEAT_HANDLE.replace(Some(handle)).unwrap();
+    }
 }
 
-#[hook("", "StandardLevelScenesTransitionSetupDataSO", "Finsih")]
+#[hook("", "StandardLevelScenesTransitionSetupDataSO", "Finish")]
 fn StandardLevelScenesTransitionSetupDataSO_Finish(
     this: &mut StandardLevelScenesTransitionSetupDataSO,
     level_completion_results: Gc<LevelCompletionResults>,
 ) {
     StandardLevelScenesTransitionSetupDataSO_Finish.original(this, level_completion_results);
+
+    // consume the optional and abort the heartbeat task
+    if let Some(handle) = unsafe { HEARTBEAT_HANDLE.lock().unwrap().take() } {
+        handle.abort();
+    }
 }
 
 #[no_mangle]
@@ -128,7 +176,10 @@ extern "C" fn party_panel_on_song_load(levels: *const *const BeatmapLevelPack, l
 
 extern "C" {
     fn quest_compat_init();
-    pub fn party_panel_run_on_main_thread(func: extern "C" fn(*mut std::ffi::c_void), arg: *mut std::ffi::c_void);
+    pub fn party_panel_run_on_main_thread(
+        func: extern "C" fn(*mut std::ffi::c_void),
+        arg: *mut std::ffi::c_void,
+    );
 }
 
 #[no_mangle]
@@ -145,12 +196,6 @@ extern "C" fn late_load() {
 
     debug!("Setting up websocket");
     RUNTIME.block_on(async {
-        unsafe {
-            WEB_CONTEXT
-                .get_or_init(|| async { Arc::new(RwLock::const_new(None)) })
-                .await
-        };
-
         setup_client().await;
     });
 }
@@ -160,7 +205,7 @@ async fn setup_client() {
 
     let (ws_stream, _response) = connect_async(url).await.expect("Failed to connect");
 
-    let mut web_context_locked = unsafe { WEB_CONTEXT.get().unwrap().write() }.await;
+    let mut web_context_locked = unsafe { WEB_CONTEXT.write().await };
 
     let web_context = web_context_locked.insert(web_context::WebContext {
         socket: todo!(),
