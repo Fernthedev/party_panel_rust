@@ -185,7 +185,7 @@ dependencies = [
 [[package]]
 name = "bs_cordl"
 version = "0.1.0"
-source = "git+https://github.com/QuestPackageManager/bs-cordl-rust.git#44824b423571eff2742ae4120b7bab7042c1d39a"
+source = "git+https://github.com/QuestPackageManager/bs-cordl-rust.git#ba48961d77bacbe0fbe4a2ce9985d5467a8d4a45"
 dependencies = [
  "quest_hook",
 ]
@@ -1358,6 +1358,7 @@ dependencies = [
  "bytes",
  "cc",
  "futures",
+ "itertools 0.14.0",
  "prost",
  "prost-build",
  "prost-types",

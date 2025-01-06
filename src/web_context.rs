@@ -1,19 +1,19 @@
-use std::collections::HashMap;
 
 use bs_cordl::{
     GlobalNamespace::{
         AdditionalContentModel, BeatmapCharacteristicSO, BeatmapDifficulty, BeatmapKey,
         BeatmapLevel, BeatmapLevelsModel, EntitlementStatus, GameplayModifiers,
         GameplayModifiers_EnabledObstacleType, GameplayModifiers_EnergyType,
-        GameplayModifiers_SongSpeed, MainFlowCoordinator, MenuTransitionsHelper, PracticeSettings,
-        SoloFreePlayFlowCoordinator, StandardLevelReturnToMenuController,
+        GameplayModifiers_SongSpeed, MainFlowCoordinator, MenuTransitionsHelper, PlayerData,
+        PracticeSettings, SoloFreePlayFlowCoordinator, StandardLevelReturnToMenuController,
     },
-    System::{Nullable_1, Threading::CancellationTokenSource},
+    System::{self, Nullable_1, Threading::CancellationTokenSource},
     UnityEngine::Resources,
     HMUI::NoTransitionsButton,
 };
 use bytes::{Buf, Bytes, BytesMut};
 use futures::TryStreamExt;
+use itertools::Itertools;
 use prost::Message;
 use quest_hook::libil2cpp::{Gc, Il2CppString};
 use tokio::{
@@ -436,6 +436,196 @@ impl WebContext {
             }
         }
     }
+
+    //     public static async Task<PreviewBeatmapLevel> ConvertToPacketType(IPreviewBeatmapLevel x, PlayerData playerData)
+    // {
+    //     //Make packet level
+    //     var level = new PreviewBeatmapLevel();
+    //     try
+    //     {
+    //         //Set Parameters;
+    //         level.LevelId = x.levelID;
+    //         level.Name = x.songName;
+    //         level.SubName = x.songSubName;
+    //         level.Author = x.songAuthorName;
+    //         level.Mapper = x.levelAuthorName;
+    //         level.BPM = x.beatsPerMinute;
+    //         level.Duration = TimeExtensions.MinSecDurationText(x.songDuration);
+    //         level.Favorited = playerData.favoritesLevelIds.Contains(x.levelID);
+    //         level.Owned = await SaberUtilities.HasDLCLevel(x.levelID);
+    //         if(!level.Owned)
+    //         {
+    //             level.OwnedJustificaton = "Unowned DLC Level";
+    //         }
+    //         if(x is CustomPreviewBeatmapLevel)
+    //         {
+    //             var extras = Collections.RetrieveExtraSongData(new string(x.levelID.Skip(13).ToArray()));
+    //             var requirements = extras?._difficulties.SelectMany((x) => { return x.additionalDifficultyData._requirements; });
+    //             List<string> missingReqs = new List<string>();
+    //             if (
+    //                 (requirements?.Count() > 0) &&
+    //                 (!requirements?.ToList().All(x => {
+    //                     if(Collections.capabilities.Contains(x))
+    //                     {
+    //                         return true;
+    //                     }
+    //                     else
+    //                     {
+    //                         missingReqs.Add(x);
+    //                         return false;
+    //                     }
+    //                 }) ?? false)
+    //             )
+    //             {
+    //                 level.Owned = false;
+    //                 level.OwnedJustificaton = "Missing " + missingReqs.Aggregate((x, x2) => { return x + x2; });
+    //             }
+    //         }
+
+    //         OverrideLabels labels = new OverrideLabels();
+    //         var songData = Collections.RetrieveExtraSongData(new string(x.levelID.Skip(13).ToArray()));
+
+    //         Dictionary<string, OverrideLabels> LevelLabels = new Dictionary<string, OverrideLabels>();
+    //         LevelLabels.Clear();
+    //         if (songData != null)
+    //         {
+    //             foreach (SongCore.Data.ExtraSongData.DifficultyData diffLevel in songData._difficulties)
+    //             {
+
+    //                 var difficulty = diffLevel._difficulty;
+    //                 string characteristic = diffLevel._beatmapCharacteristicName;
+
+    //                 if (!LevelLabels.ContainsKey(characteristic))
+    //                 {
+    //                     LevelLabels.Add(characteristic, new OverrideLabels());
+    //                 }
+
+    //                 var charLabels = LevelLabels[characteristic];
+    //                 if (!string.IsNullOrWhiteSpace(diffLevel._difficultyLabel))
+    //                 {
+
+    //                     switch (difficulty)
+    //                     {
+    //                         case BeatmapDifficulty.Easy:
+    //                             charLabels.EasyOverride = diffLevel._difficultyLabel;
+    //                             break;
+    //                         case BeatmapDifficulty.Normal:
+    //                             charLabels.NormalOverride = diffLevel._difficultyLabel;
+    //                             break;
+    //                         case BeatmapDifficulty.Hard:
+    //                             charLabels.HardOverride = diffLevel._difficultyLabel;
+    //                             break;
+    //                         case BeatmapDifficulty.Expert:
+    //                             charLabels.ExpertOverride = diffLevel._difficultyLabel;
+    //                             break;
+    //                         case BeatmapDifficulty.ExpertPlus:
+    //                             charLabels.ExpertPlusOverride = diffLevel._difficultyLabel;
+    //                             break;
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         level.chars = x.previewDifficultyBeatmapSets.Select((PreviewDifficultyBeatmapSet set) => { Characteristic Char = new Characteristic(); Char.Name = set.beatmapCharacteristic.serializedName;    Char.diffs = set.beatmapDifficulties.Select((BeatmapDifficulty diff)=> { return Name(LevelLabels.ContainsKey(Char.Name) ? LevelLabels[Char.Name]: null, diff); }).ToArray(); return Char; }).ToArray();
+    //         if (x.GetType().Name.Contains("BeatmapLevelSO"))
+    //         {
+    //             Texture2D tex;
+    //             Sprite sprite = (await x.GetCoverImageAsync(System.Threading.CancellationToken.None));
+    //             try
+    //             {
+    //                 tex = sprite.texture;
+    //             }
+    //             catch
+    //             {
+    //                 tex = GetFromUnreadable((x as CustomPreviewBeatmapLevel)?.defaultCoverImage.texture, sprite.textureRect);
+    //             }
+    //             if (!(x is CustomPreviewBeatmapLevel) || tex == null || !tex.isReadable)
+    //             {
+    //                 tex = GetFromUnreadable(tex, InvertAtlas(sprite.textureRect));
+    //             }
+    //             level.cover = tex.EncodeToJPG();
+    //         }
+    //         else
+    //         {
+    //             if(x is CustomPreviewBeatmapLevel)
+    //             {
+    //                 string path = Path.Combine(((CustomPreviewBeatmapLevel)x).customLevelPath, ((CustomPreviewBeatmapLevel)x).standardLevelInfoSaveData.coverImageFilename);
+    //                 if (File.Exists(path))
+    //                 {
+    //                     level.coverPath = path;
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     catch(Exception e)
+    //     {
+    //         Logger.Error(e.ToString());
+    //     }
+    //     return level;
+    // }
+    pub async fn convert_to_packet_type(
+        &mut self,
+        mut x: Gc<BeatmapLevel>,
+        mut player_data: Gc<PlayerData>,
+    ) -> Result<PreviewBeatmapLevel, Box<dyn std::error::Error>> {
+        fn format_duration(duration: f32) -> String {
+            if duration.is_nan() {
+                return String::new();
+            }
+            let minutes = (duration / 60.0) as i32;
+            let seconds = (duration % 60.0) as i32;
+            format!("{}:{:02}", minutes, seconds)
+        }
+
+        let mut level = PreviewBeatmapLevel {
+            level_id: x.levelID.to_string_lossy(),
+            name: x.songName.to_string_lossy().to_string(),
+            sub_name: x.songSubName.to_string_lossy().to_string(),
+            author: x.songAuthorName.to_string_lossy().to_string(),
+            mapper: x
+                .allMappers
+                .as_slice()
+                .iter()
+                .map(|m| m.to_string_lossy())
+                .join(","),
+            bpm: x.beatsPerMinute,
+            duration: format_duration(x.songDuration),
+            favorited: player_data.get_favoritesLevelIds()?.Contains(x.levelID)?,
+            ..Default::default()
+        };
+        level.owned = self.has_dlc_level(&level.level_id, None).await?;
+
+        if !level.owned {
+            level.owned_justification = "Unowned DLC Level".to_string();
+        }
+        level.chars = System::Linq::Enumerable::ToList(x.GetBeatmapKeys()?)?
+            ._items
+            .as_slice()
+            .iter()
+            .filter(|i| **i != BeatmapKey::default())
+            .map(|i| (i.beatmapCharacteristic, i.difficulty))
+            .chunk_by(|(characteristic, _)| *characteristic)
+            .into_iter()
+            .map(
+                |(characteristic, difficulties)| -> quest_hook::libil2cpp::Result<_> {
+                    let char = proto::items::Characteristic {
+                        name: characteristic
+                            .clone()
+                            .get_serializedName()?
+                            .to_string_lossy()
+                            .to_string(),
+                        diffs: difficulties
+                            .map(|(_, diff)| difficulty_name(diff))
+                            .collect::<Vec<_>>(),
+                    };
+                    Ok(char)
+                },
+            )
+            .try_collect()?;
+
+        // Skip cover image handling for now as it requires more complex Unity texture manipulation
+
+        Ok(level)
+    }
 }
 
 fn energy_type_from_i32(value: i32) -> GameplayModifiers_EnergyType {
@@ -462,5 +652,16 @@ fn song_speed_from_i32(value: i32) -> GameplayModifiers_SongSpeed {
         2 => GameplayModifiers_SongSpeed::Slower,
         3 => GameplayModifiers_SongSpeed::SuperFast,
         _ => GameplayModifiers_SongSpeed::Normal,
+    }
+}
+
+fn difficulty_name(difficulty: BeatmapDifficulty) -> String {
+    match difficulty {
+        BeatmapDifficulty::Easy => "Easy".to_string(),
+        BeatmapDifficulty::Normal => "Normal".to_string(),
+        BeatmapDifficulty::Hard => "Hard".to_string(),
+        BeatmapDifficulty::Expert => "Expert".to_string(),
+        BeatmapDifficulty::ExpertPlus => "ExpertPlus".to_string(),
+        _ => "Unknown".to_string(),
     }
 }

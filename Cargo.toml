@@ -46,13 +46,15 @@ bs_cordl = { git = "https://github.com/QuestPackageManager/bs-cordl-rust.git", f
     "UnityEngine+Resources",
     "AdditionalContentModel",
     "StandardLevelReturnToMenuController",
-    "MainThreadDispatcher"
+    "MainThreadDispatcher",
+    "System+Linq+Enumerable"
 ] }
 bytes = "1.9.0"
 
 prost = "0.13"
 # Only necessary if using Protobuf well-known types:
 prost-types = "0.13"
+itertools = "0.14.0"
 
 [workspace]
 
