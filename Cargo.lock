@@ -185,7 +185,7 @@ dependencies = [
 [[package]]
 name = "bs_cordl"
 version = "0.1.0"
-source = "git+https://github.com/QuestPackageManager/bs-cordl-rust.git#aed573eec7d9edda95540e4e90baea5f662635c8"
+source = "git+https://github.com/QuestPackageManager/bs-cordl-rust.git#44824b423571eff2742ae4120b7bab7042c1d39a"
 dependencies = [
  "quest_hook",
 ]

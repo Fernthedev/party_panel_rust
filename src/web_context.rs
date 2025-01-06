@@ -37,7 +37,7 @@ use crate::{
 };
 
 pub struct WebContext {
-    pub songs: HashMap<SongId, SongData>,
+    pub songs: Vec<SongData>,
     pub level_cancellation_token_source: Option<Gc<CancellationTokenSource>>,
     pub get_status_cancellation_token_source: Option<Gc<CancellationTokenSource>>,
     pub flow: Option<Gc<SoloFreePlayFlowCoordinator>>,
@@ -45,7 +45,7 @@ pub struct WebContext {
 }
 
 pub struct SongData {
-    hash: SongId,
+    pub hash: SongId,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -93,13 +93,8 @@ impl WebContext {
                 self.songs = song_list
                     .levels
                     .into_iter()
-                    .map(|song| {
-                        (
-                            SongId(song.level_id.clone()),
-                            SongData {
-                                hash: SongId(song.level_id),
-                            },
-                        )
+                    .map(|song| SongData {
+                        hash: SongId(song.level_id),
                     })
                     .collect();
             }

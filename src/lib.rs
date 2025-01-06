@@ -22,6 +22,7 @@ use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
 use tokio_tungstenite::connect_async;
 use tracing::debug;
+use web_context::SongData;
 
 mod web_context;
 
@@ -167,10 +168,22 @@ extern "C" fn party_panel_on_song_load(levels: *const *const BeatmapLevelPack, l
     unsafe {
         let levels_slice = std::slice::from_raw_parts(levels, len);
 
-        let levels_converted: Vec<Gc<BeatmapLevelPack>> = levels_slice
+        let levels_converted = levels_slice
             .iter()
             .map(|level| Gc::from(*level))
+            .flat_map(|level_pack| level_pack._beatmapLevels.as_slice().to_vec())
+            .map(|level| SongData {
+                // mappers love invalid UTF-8/UTF-16!
+                hash: web_context::SongId(level.levelID.to_string_lossy()),
+            })
             .collect::<Vec<_>>();
+
+        RUNTIME.spawn(async {
+            let mut web_context_locked = unsafe { WEB_CONTEXT.write().await };
+            if let Some(web_context) = web_context_locked.as_mut() {
+                web_context.songs = levels_converted;
+            }
+        });
     }
 }
 
