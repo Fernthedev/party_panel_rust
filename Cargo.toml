@@ -18,7 +18,7 @@ qpm_cli = { git = "https://github.com/QuestPackageManager/QPM.CLI.git", default-
 quest_hook = { git = "https://github.com/Fernthedev/quest-hook-rs.git", features = [
     "il2cpp_v31",
 ], branch = "cordl-fixes" }
-scotland2_rs = { git = "https://github.com/QuestPackageManager/scotland2_rs.git", tag = "v0.2.0" }
+scotland2_rs = { git = "https://github.com/QuestPackageManager/scotland2_rs.git", tag = "v0.2.1" }
 
 tokio-tungstenite = "*"
 tokio = { version = "1", features = [
