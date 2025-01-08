@@ -1,11 +1,12 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use bs_cordl::{
     GlobalNamespace::{
         AdditionalContentModel, BeatmapCharacteristicSO, BeatmapDifficulty, BeatmapKey,
         BeatmapLevel, BeatmapLevelsModel, EntitlementStatus, GameplayModifiers,
         GameplayModifiers_EnabledObstacleType, GameplayModifiers_EnergyType,
         GameplayModifiers_SongSpeed, MainFlowCoordinator, MenuTransitionsHelper, PlayerData,
-        PracticeSettings, SoloFreePlayFlowCoordinator, StandardLevelReturnToMenuController,
+        PlayerDataModel, PracticeSettings, SoloFreePlayFlowCoordinator,
+        StandardLevelReturnToMenuController,
     },
     System::{
         self, Nullable_1,
@@ -34,17 +35,14 @@ use crate::{
     proto::{
         self,
         items::PreviewBeatmapLevel,
-        packets::{
-            AllSongs, Command, DownloadSong, NowPlaying, NowPlayingUpdate, PlaySong, PreviewSong,
-            SongList,
-        },
+        packets::{Command, DownloadSong, PlaySong, SongList},
         CommandType, PacketType, PartyPacket,
     },
 };
 
 pub struct WebContext {
     pub songs: Vec<SongData>,
-    pub player_data: Gc<PlayerData>,
+    pub player_data: Gc<PlayerDataModel>,
     pub level_cancellation_token_source: Option<Gc<CancellationTokenSource>>,
     pub get_status_cancellation_token_source: Option<Gc<CancellationTokenSource>>,
     pub flow: Option<Gc<SoloFreePlayFlowCoordinator>>,
@@ -84,7 +82,10 @@ impl WebContext {
                 return Err(anyhow!("Failed to read the full buffer"));
             }
 
-            self.parse_packet(packet_type, buf.copy_to_bytes(len))?;
+            let error = self.parse_packet(packet_type, buf.copy_to_bytes(len)).await;
+            if let Err(e) = error {
+                info!("Error parsing packet: {:?}", e);
+            }
         }
 
         Ok(())
@@ -107,7 +108,7 @@ impl WebContext {
         let levels = self.songs.iter().map(|s| s.level.clone()).collect_vec();
         for level in levels {
             let preview_level =
-                Self::convert_to_packet_type(level, player_data, Some(token.clone()));
+                Self::convert_to_packet_type(level, player_data._playerData, Some(token.clone()));
             level_futures.push(preview_level);
         }
 
@@ -118,48 +119,76 @@ impl WebContext {
         Ok(())
     }
 
-    fn parse_packet(&mut self, packet_type: PacketType, data: Bytes) -> anyhow::Result<()> {
+    ///
+    ///
+    ///
+    async fn parse_packet(&mut self, packet_type: PacketType, data: Bytes) -> anyhow::Result<()> {
+        /*
+                   if (packet.Type == PacketType.PlaySong)
+           {
+               PlaySong playSong = packet.SpecificPacket as PlaySong;
+
+               var desiredLevel = Plugin.masterLevelList.First(x => x.levelID == playSong.levelId);
+               var desiredCharacteristic = desiredLevel.previewDifficultyBeatmapSets.Select(level => level.beatmapCharacteristic).First(x => x.serializedName == playSong.characteristic.Name);
+               BeatmapDifficulty desiredDifficulty;
+               playSong.difficulty.BeatmapDifficultyFromSerializedName(out desiredDifficulty);
+
+               SaberUtilities.PlaySong(desiredLevel, desiredCharacteristic, desiredDifficulty, playSong);
+           }
+           else if (packet.Type == PacketType.Command)
+           {
+               Command command = packet.SpecificPacket as Command;
+               if (command.commandType == Command.CommandType.ReturnToMenu)
+               {
+                   SaberUtilities.ReturnToMenu();
+               }
+           }
+           else if (packet.Type == PacketType.DownloadSong)
+           {
+               DownloadSong download = packet.SpecificPacket as DownloadSong;
+
+               Task.Run(async () => { await BeatSaverDownloader.Misc.SongDownloader.Instance.DownloadSong(Plugin.Client.Beatmap(download.songKey).Result, CancellationToken.None); SongCore.Loader.Instance.RefreshSongs(); });
+           }
+        */
+
         match packet_type {
-            PacketType::SongList => {
-                // let song_list = SongList::decode(data)?;
-                // self.songs = song_list
-                //     .levels
-                //     .into_iter()
-                //     .map(|song| SongData {
-                //         hash: SongId(song.level_id),
-                //     })
-                //     .collect();
+            PacketType::PlaySong => {
+                let playsong = PlaySong::decode(data)?;
+                let desired_level = self
+                    .songs
+                    .iter()
+                    .find(|x| x.hash.0 == playsong.level_id)
+                    .ok_or_else(|| anyhow!("Level not found"))?;
+
+                let desired_characteristic = self
+                    .player_data
+                    ._playerDataFileModel
+                    ._beatmapCharacteristicCollection
+                    .GetBeatmapCharacteristicBySerializedName(Il2CppString::new(
+                        &playsong.characteristic.as_ref().unwrap().name,
+                    ))
+                    .context(anyhow!("Characteristic not found"))?;
+
+                let desired_diff = difficulty_from_name(&playsong.difficulty);
+                self.play_song(
+                    desired_level.level,
+                    desired_characteristic,
+                    desired_diff,
+                    &playsong,
+                )
+                .await?;
             }
             PacketType::Command => {
                 let command = Command::decode(data)?;
                 let command_type = CommandType::from(command.command_type);
-                match command_type {
-                    CommandType::Heartbeat => {
-                        // heartbeat
-                    }
-                    CommandType::ReturnToMenu => {
-                        // return to menu
-                    }
-                    _ => {}
+                if let CommandType::ReturnToMenu = command_type {
+                    self.return_to_menu();
+                    // return to menu
                 }
-            }
-            PacketType::NowPlaying => {
-                let now_playing = NowPlaying::decode(data)?;
-            }
-            PacketType::NowPlayingUpdate => {
-                let now_playing_update = NowPlayingUpdate::decode(data)?;
-            }
-            PacketType::PlaySong => {
-                let play_song = PlaySong::decode(data)?;
-            }
-            PacketType::PreviewSong => {
-                let preview_song = PreviewSong::decode(data)?;
             }
             PacketType::DownloadSong => {
                 let download_song = DownloadSong::decode(data)?;
-            }
-            PacketType::AllSongs => {
-                let all_songs = AllSongs::decode(data)?;
+                // TODO: download song
             }
             _ => {}
         }
@@ -209,7 +238,7 @@ impl WebContext {
 
     pub async fn play_song(
         &mut self,
-        level: &PreviewBeatmapLevel,
+        beatmap_level: Gc<BeatmapLevel>,
         characteristic: Gc<BeatmapCharacteristicSO>,
         difficulty: BeatmapDifficulty,
         packet: &PlaySong,
@@ -244,11 +273,6 @@ impl WebContext {
         }
 
         unsafe { party_panel_run_on_main_thread(click_solo_button, std::ptr::null_mut()) }
-
-        let loaded_level = self.get_level_from_preview(level)?;
-        let Some(beatmap_level) = loaded_level else {
-            return Ok(());
-        };
 
         let mut menu_scene_setup_data =
             Resources::FindObjectsOfTypeAll_1::<Gc<MenuTransitionsHelper>>()?
@@ -682,5 +706,16 @@ fn difficulty_name(difficulty: BeatmapDifficulty) -> String {
         BeatmapDifficulty::Expert => "Expert".to_string(),
         BeatmapDifficulty::ExpertPlus => "ExpertPlus".to_string(),
         _ => "Unknown".to_string(),
+    }
+}
+
+fn difficulty_from_name(name: &str) -> BeatmapDifficulty {
+    match name {
+        "Easy" => BeatmapDifficulty::Easy,
+        "Normal" => BeatmapDifficulty::Normal,
+        "Hard" => BeatmapDifficulty::Hard,
+        "Expert" => BeatmapDifficulty::Expert,
+        "ExpertPlus" => BeatmapDifficulty::ExpertPlus,
+        _ => BeatmapDifficulty::default(),
     }
 }
