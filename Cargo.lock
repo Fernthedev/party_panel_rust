@@ -63,6 +63,9 @@ name = "anyhow"
 version = "1.0.95"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34ac096ce696dc2fcabef30516bb13c0a68a11d30131d3df6f04711467681b04"
+dependencies = [
+ "backtrace",
+]
 
 [[package]]
 name = "arbitrary"
@@ -925,7 +928,7 @@ dependencies = [
 [[package]]
 name = "inline_hook"
 version = "0.1.0"
-source = "git+https://github.com/Fernthedev/quest-hook-rs.git?branch=cordl-fixes#f07aa16b9ffab14bbc0d70447b2aa3e931c5945b"
+source = "git+https://github.com/Fernthedev/quest-hook-rs.git?branch=cordl-fixes#f0e91f74d320409e957c8e2a02276dc92fc7677c"
 dependencies = [
  "cc",
  "cfg-if",
@@ -1020,7 +1023,7 @@ checksum = "b5aba8db14291edd000dfcc4d620c7ebfb122c613afb886ca8803fa4e128a20a"
 [[package]]
 name = "libil2cpp"
 version = "0.1.0"
-source = "git+https://github.com/Fernthedev/quest-hook-rs.git?branch=cordl-fixes#f07aa16b9ffab14bbc0d70447b2aa3e931c5945b"
+source = "git+https://github.com/Fernthedev/quest-hook-rs.git?branch=cordl-fixes#f0e91f74d320409e957c8e2a02276dc92fc7677c"
 dependencies = [
  "bindgen",
  "libloading",
@@ -1061,9 +1064,9 @@ dependencies = [
 
 [[package]]
 name = "linux-raw-sys"
-version = "0.4.14"
+version = "0.4.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78b3ae25bc7c8c38cec158d1f2757ee79e9b3740fbc7ccf0e59e4b08d793fa89"
+checksum = "d26c52dbd32dccf2d10cac7725f8eae5296885fb5703b261f7d0a0739ec807ab"
 
 [[package]]
 name = "litemap"
@@ -1354,6 +1357,7 @@ dependencies = [
 name = "party_panel"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bs_cordl",
  "bytes",
  "cc",
@@ -1580,7 +1584,7 @@ dependencies = [
 [[package]]
 name = "quest_hook"
 version = "0.1.0"
-source = "git+https://github.com/Fernthedev/quest-hook-rs.git?branch=cordl-fixes#f07aa16b9ffab14bbc0d70447b2aa3e931c5945b"
+source = "git+https://github.com/Fernthedev/quest-hook-rs.git?branch=cordl-fixes#f0e91f74d320409e957c8e2a02276dc92fc7677c"
 dependencies = [
  "cfg-if",
  "inline_hook",
@@ -1596,7 +1600,7 @@ dependencies = [
 [[package]]
 name = "quest_hook_proc_macros"
 version = "0.1.0"
-source = "git+https://github.com/Fernthedev/quest-hook-rs.git?branch=cordl-fixes#f07aa16b9ffab14bbc0d70447b2aa3e931c5945b"
+source = "git+https://github.com/Fernthedev/quest-hook-rs.git?branch=cordl-fixes#f0e91f74d320409e957c8e2a02276dc92fc7677c"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -1868,9 +1872,9 @@ checksum = "c7fb8039b3032c191086b10f11f319a6e99e1e82889c5cc6046f515c9db1d497"
 
 [[package]]
 name = "rustix"
-version = "0.38.42"
+version = "0.38.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f93dc38ecbab2eb790ff964bb77fa94faf256fd3e73285fd7ba0903b76bedb85"
+checksum = "a78891ee6bf2340288408954ac787aa063d8e8817e9f53abb37c695c6d834ef6"
 dependencies = [
  "bitflags 2.6.0",
  "errno",
@@ -2828,9 +2832,9 @@ checksum = "1e9df38ee2d2c3c5948ea468a8406ff0db0b29ae1ffde1bcf20ef305bcc95c51"
 
 [[package]]
 name = "xml-rs"
-version = "0.8.24"
+version = "0.8.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea8b391c9a790b496184c29f7f93b9ed5b16abb306c05415b68bcc16e4d06432"
+checksum = "c5b940ebc25896e71dd073bad2dbaa2abfe97b0a391415e22ad1326d9c54e3c4"
 
 [[package]]
 name = "yoke"

@@ -1,4 +1,4 @@
-
+use anyhow::anyhow;
 use bs_cordl::{
     GlobalNamespace::{
         AdditionalContentModel, BeatmapCharacteristicSO, BeatmapDifficulty, BeatmapKey,
@@ -7,12 +7,18 @@ use bs_cordl::{
         GameplayModifiers_SongSpeed, MainFlowCoordinator, MenuTransitionsHelper, PlayerData,
         PracticeSettings, SoloFreePlayFlowCoordinator, StandardLevelReturnToMenuController,
     },
-    System::{self, Nullable_1, Threading::CancellationTokenSource},
+    System::{
+        self, Nullable_1,
+        Threading::{CancellationToken, CancellationTokenSource},
+    },
     UnityEngine::Resources,
     HMUI::NoTransitionsButton,
 };
 use bytes::{Buf, Bytes, BytesMut};
-use futures::TryStreamExt;
+use futures::{
+    future::{self},
+    TryStreamExt,
+};
 use itertools::Itertools;
 use prost::Message;
 use quest_hook::libil2cpp::{Gc, Il2CppString};
@@ -38,6 +44,7 @@ use crate::{
 
 pub struct WebContext {
     pub songs: Vec<SongData>,
+    pub player_data: Gc<PlayerData>,
     pub level_cancellation_token_source: Option<Gc<CancellationTokenSource>>,
     pub get_status_cancellation_token_source: Option<Gc<CancellationTokenSource>>,
     pub flow: Option<Gc<SoloFreePlayFlowCoordinator>>,
@@ -46,13 +53,14 @@ pub struct WebContext {
 
 pub struct SongData {
     pub hash: SongId,
+    pub level: Gc<BeatmapLevel>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct SongId(pub String);
 
 impl WebContext {
-    pub async fn read_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn read_loop(&mut self) -> anyhow::Result<()> {
         let mut buf: BytesMut = BytesMut::with_capacity(1024);
 
         loop {
@@ -62,7 +70,7 @@ impl WebContext {
 
             // continue? restart loop
             if header != "moon".as_bytes() {
-                return Err("Invalid header".into());
+                return Err(anyhow!("Invalid header"));
             }
 
             let packet_type: PacketType = self.socket.read_i32().await?.into();
@@ -73,7 +81,7 @@ impl WebContext {
 
             let buffer = self.socket.read_exact(&mut buf).await?;
             if buffer < len {
-                return Err("Failed to read the full buffer".into());
+                return Err(anyhow!("Failed to read the full buffer"));
             }
 
             self.parse_packet(packet_type, buf.copy_to_bytes(len))?;
@@ -82,21 +90,45 @@ impl WebContext {
         Ok(())
     }
 
-    pub fn parse_packet(
-        &mut self,
-        packet_type: PacketType,
-        data: Bytes,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn update(&mut self) -> anyhow::Result<()> {
+        let player_data = self.player_data.clone();
+
+        if let Some(mut source) = self.get_status_cancellation_token_source {
+            source.Cancel_0()?;
+        }
+        self.get_status_cancellation_token_source = Some(CancellationTokenSource::New_0()?);
+
+        let token = self
+            .get_status_cancellation_token_source
+            .unwrap()
+            .get_Token()?;
+
+        let mut level_futures = Vec::with_capacity(self.songs.len());
+        let levels = self.songs.iter().map(|s| s.level.clone()).collect_vec();
+        for level in levels {
+            let preview_level =
+                Self::convert_to_packet_type(level, player_data, Some(token.clone()));
+            level_futures.push(preview_level);
+        }
+
+        let levels = future::try_join_all(level_futures).await?;
+
+        self.write_packet(SongList { levels }).await?;
+
+        Ok(())
+    }
+
+    fn parse_packet(&mut self, packet_type: PacketType, data: Bytes) -> anyhow::Result<()> {
         match packet_type {
             PacketType::SongList => {
-                let song_list = SongList::decode(data)?;
-                self.songs = song_list
-                    .levels
-                    .into_iter()
-                    .map(|song| SongData {
-                        hash: SongId(song.level_id),
-                    })
-                    .collect();
+                // let song_list = SongList::decode(data)?;
+                // self.songs = song_list
+                //     .levels
+                //     .into_iter()
+                //     .map(|song| SongData {
+                //         hash: SongId(song.level_id),
+                //     })
+                //     .collect();
             }
             PacketType::Command => {
                 let command = Command::decode(data)?;
@@ -135,10 +167,7 @@ impl WebContext {
         Ok(())
     }
 
-    pub async fn write_packet(
-        &mut self,
-        packet: impl PartyPacket,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn write_packet(&mut self, packet: impl PartyPacket) -> anyhow::Result<()> {
         let packet_type = packet.get_type();
         let data = packet.encode_to_vec();
 
@@ -184,7 +213,7 @@ impl WebContext {
         characteristic: Gc<BeatmapCharacteristicSO>,
         difficulty: BeatmapDifficulty,
         packet: &PlaySong,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<()> {
         self.flow = Resources::FindObjectsOfTypeAll_1::<Gc<MainFlowCoordinator>>()?
             .as_slice()
             .first()
@@ -226,7 +255,7 @@ impl WebContext {
                 .as_slice()
                 .first()
                 .copied()
-                .ok_or("No MenuTransitionsHelper found")?;
+                .ok_or(anyhow!("No MenuTransitionsHelper found"))?;
 
         let key = BeatmapKey {
             beatmapCharacteristic: characteristic,
@@ -348,10 +377,10 @@ impl WebContext {
     //     return false;
     // }
     pub async fn has_dlc_level(
-        &mut self,
         level_id: &str,
         additional_content_model: Option<Gc<AdditionalContentModel>>,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
+        token: Option<CancellationToken>,
+    ) -> anyhow::Result<bool> {
         if !level_id.starts_with("custom_level_") {
             info!("{}", level_id);
         }
@@ -366,20 +395,10 @@ impl WebContext {
             return Ok(false);
         };
 
-        if let Some(mut source) = self.get_status_cancellation_token_source {
-            source.Cancel_0()?;
-        }
-        self.get_status_cancellation_token_source = Some(CancellationTokenSource::New_0()?);
-
-        let token = self
-            .get_status_cancellation_token_source
-            .unwrap()
-            .get_Token()?;
-
         let status = model
             .IAdditionalContentEntitlementModel_GetLevelEntitlementStatusAsync(
                 Il2CppString::new(level_id),
-                token,
+                token.unwrap_or_default(),
             )?
             .into_awaitable()
             .await?;
@@ -416,7 +435,7 @@ impl WebContext {
     pub fn get_level_from_preview(
         &mut self,
         level: &PreviewBeatmapLevel,
-    ) -> Result<Option<Gc<BeatmapLevel>>, Box<dyn std::error::Error>> {
+    ) -> anyhow::Result<Option<Gc<BeatmapLevel>>> {
         let beatmap_levels_model = Resources::FindObjectsOfTypeAll_1::<Gc<BeatmapLevelsModel>>()?
             .as_slice()
             .first()
@@ -563,10 +582,10 @@ impl WebContext {
     //     return level;
     // }
     pub async fn convert_to_packet_type(
-        &mut self,
         mut x: Gc<BeatmapLevel>,
         mut player_data: Gc<PlayerData>,
-    ) -> Result<PreviewBeatmapLevel, Box<dyn std::error::Error>> {
+        token: Option<CancellationToken>,
+    ) -> anyhow::Result<PreviewBeatmapLevel> {
         fn format_duration(duration: f32) -> String {
             if duration.is_nan() {
                 return String::new();
@@ -592,7 +611,7 @@ impl WebContext {
             favorited: player_data.get_favoritesLevelIds()?.Contains(x.levelID)?,
             ..Default::default()
         };
-        level.owned = self.has_dlc_level(&level.level_id, None).await?;
+        level.owned = Self::has_dlc_level(&level.level_id, None, token).await?;
 
         if !level.owned {
             level.owned_justification = "Unowned DLC Level".to_string();

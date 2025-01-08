@@ -43,7 +43,7 @@ static mut HEARTBEAT_HANDLE: Mutex<Option<tokio::task::JoinHandle<()>>> = Mutex:
 
 static mut WEB_CONTEXT: RwLock<Option<web_context::WebContext>> = RwLock::const_new(None);
 
-async fn heartbeat_timer() -> Result<(), Box<dyn std::error::Error>> {
+async fn heartbeat_timer() -> anyhow::Result<()> {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
         interval.tick().await;
@@ -175,6 +175,7 @@ extern "C" fn party_panel_on_song_load(levels: *const *const BeatmapLevelPack, l
             .map(|level| SongData {
                 // mappers love invalid UTF-8/UTF-16!
                 hash: web_context::SongId(level.levelID.to_string_lossy()),
+                level,
             })
             .collect::<Vec<_>>();
 
@@ -182,6 +183,7 @@ extern "C" fn party_panel_on_song_load(levels: *const *const BeatmapLevelPack, l
             let mut web_context_locked = unsafe { WEB_CONTEXT.write().await };
             if let Some(web_context) = web_context_locked.as_mut() {
                 web_context.songs = levels_converted;
+                web_context.update().await.unwrap();
             }
         });
     }
@@ -226,6 +228,7 @@ async fn setup_client() {
         get_status_cancellation_token_source: None,
         level_cancellation_token_source: None,
         songs: Default::default(),
+        player_data: todo!(),
     });
 
     println!("WebSocket handshake has been successfully completed");
