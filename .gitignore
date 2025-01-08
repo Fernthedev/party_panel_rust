@@ -12,3 +12,4 @@ qpm_defines.cmake
 build_cmake/
 .cache
 flag_check.exe
+log.txt

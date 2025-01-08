@@ -20,6 +20,9 @@
         "buildcpp": [
           "cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -B build_cmake",
           "cmake --build ./build_cmake"
+        ],
+        "copy": [
+          "pwsh ./copy.ps1"
         ]
       },
       "qmodIncludeDirs": [
@@ -36,7 +39,7 @@
       },
       {
         "id": "beatsaber-hook",
-        "versionRange": "^6.2.0",
+        "versionRange": "^6.3.0",
         "additionalData": {}
       },
       {
@@ -77,12 +80,12 @@
     {
       "dependency": {
         "id": "paper2_scotland2",
-        "versionRange": "=4.3.2",
+        "versionRange": "=4.4.0",
         "additionalData": {
-          "soLink": "https://github.com/Fernthedev/paperlog/releases/download/v4.3.2/libpaper2_scotland2.so",
+          "soLink": "https://github.com/Fernthedev/paperlog/releases/download/v4.4.0/libpaper2_scotland2.so",
           "overrideSoName": "libpaper2_scotland2.so",
-          "modLink": "https://github.com/Fernthedev/paperlog/releases/download/v4.3.2/paper2_scotland2.qmod",
-          "branchName": "version/v4_3_2",
+          "modLink": "https://github.com/Fernthedev/paperlog/releases/download/v4.4.0/paper2_scotland2.qmod",
+          "branchName": "version/v4_4_0",
           "compileOptions": {
             "systemIncludes": [
               "shared/utfcpp/source"
@@ -91,7 +94,7 @@
           "cmake": false
         }
       },
-      "version": "4.3.2"
+      "version": "4.4.0"
     },
     {
       "dependency": {

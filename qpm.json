@@ -16,6 +16,9 @@
       "build": [
         "cargo ndk --bindgen -t arm64-v8a -o ./build build --release"
       ],
+      "copy": [
+        "pwsh ./copy.ps1"
+      ],
       "buildcpp": [
         "cmake -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -B build_cmake",
         "cmake --build ./build_cmake"
@@ -35,7 +38,7 @@
     },
     {
       "id": "beatsaber-hook",
-      "versionRange": "^6.2.0",
+      "versionRange": "^6.3.0",
       "additionalData": {}
     },
     {
