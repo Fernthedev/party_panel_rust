@@ -47,6 +47,7 @@ bs_cordl = { git = "https://github.com/QuestPackageManager/bs-cordl-rust.git", f
     "AdditionalContentModel",
     "StandardLevelReturnToMenuController",
     "MainThreadDispatcher",
+    "ScoreController",
     "System+Linq+Enumerable",
 ] }
 bytes = "1.9.0"

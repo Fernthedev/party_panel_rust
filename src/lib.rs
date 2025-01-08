@@ -9,9 +9,10 @@ use bs_cordl::GlobalNamespace::{
     AudioClipAsyncLoader, BeatmapDataLoader, BeatmapKey, BeatmapLevel, BeatmapLevelPack,
     BeatmapLevelsEntitlementModel, BeatmapLevelsModel, ColorScheme, EnvironmentsListModel,
     GameplayModifiers, LevelCompletionResults, OverrideEnvironmentSettings, PlayerSpecificSettings,
-    PracticeSettings, RecordingToolManager_SetupData, SettingsManager,
+    PracticeSettings, RecordingToolManager_SetupData, ScoreController, SettingsManager,
     StandardLevelScenesTransitionSetupDataSO,
 };
+use bs_cordl::UnityEngine::Resources;
 use futures::StreamExt;
 use proto::packets::NowPlayingUpdate;
 use quest_hook::hook;
@@ -43,22 +44,23 @@ static mut HEARTBEAT_HANDLE: Mutex<Option<tokio::task::JoinHandle<()>>> = Mutex:
 
 static mut WEB_CONTEXT: RwLock<Option<web_context::WebContext>> = RwLock::const_new(None);
 
-async fn heartbeat_timer() -> anyhow::Result<()> {
+async fn heartbeat_timer(mut score: Gc<ScoreController>) -> anyhow::Result<()> {
     let mut interval = tokio::time::interval(Duration::from_secs(1));
     loop {
         interval.tick().await;
         // Assuming we have similar data structures in Rust
         // This is a placeholder implementation - you'll need to adapt it
         // to your actual data structures
-        let Some(context) = (unsafe { WEB_CONTEXT.write().await }).as_mut() else {
+        let mut guard = unsafe { WEB_CONTEXT.write().await };
+        let Some(context) = guard.as_mut() else {
             return Ok(());
         };
 
         let packet = NowPlayingUpdate {
-            score: todo!(),
-            accuracy: todo!(),
-            elapsed: todo!(),
-            total_time: todo!(),
+            score: score._modifiedScore,
+            accuracy: 0.0,
+            elapsed: score._audioTimeSyncController._songTime as i32,
+            total_time: score._audioTimeSyncController.get_songLength()? as i32,
         };
 
         context.write_packet(packet).await?;
@@ -122,8 +124,15 @@ fn StandardLevelScenesTransitionSetupDataSO_Init(
         recording_tool_data,
     );
 
-    let handle = RUNTIME.spawn(async {
-        heartbeat_timer().await.unwrap();
+    let score_controller = Resources::FindObjectsOfTypeAll_1::<Gc<ScoreController>>()
+        .unwrap()
+        .as_slice()
+        .first()
+        .copied()
+        .unwrap();
+
+    let handle = RUNTIME.spawn(async move {
+        heartbeat_timer(score_controller).await.unwrap();
     });
 
     unsafe {
