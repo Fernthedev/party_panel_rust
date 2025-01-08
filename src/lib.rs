@@ -2,32 +2,37 @@
 #![feature(generic_arg_infer)]
 #![feature(lock_value_accessors)]
 
+use std::ffi::CStr;
+use std::path::PathBuf;
 use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
+use anyhow::Context;
 use bs_cordl::GlobalNamespace::{
     AudioClipAsyncLoader, BeatmapDataLoader, BeatmapKey, BeatmapLevel, BeatmapLevelPack,
     BeatmapLevelsEntitlementModel, BeatmapLevelsModel, ColorScheme, EnvironmentsListModel,
-    GameplayModifiers, LevelCompletionResults, OverrideEnvironmentSettings, PlayerSpecificSettings,
-    PracticeSettings, RecordingToolManager_SetupData, ScoreController, SettingsManager,
-    StandardLevelScenesTransitionSetupDataSO,
+    GameplayModifiers, LevelCompletionResults, OverrideEnvironmentSettings, PlayerDataModel,
+    PlayerSpecificSettings, PracticeSettings, RecordingToolManager_SetupData, ScoreController,
+    SettingsManager, StandardLevelScenesTransitionSetupDataSO,
 };
 use bs_cordl::UnityEngine::Resources;
+use config::Config;
 use futures::StreamExt;
 use proto::packets::NowPlayingUpdate;
 use quest_hook::hook;
 use quest_hook::libil2cpp::{Gc, Il2CppString};
 use scotland2_rs::scotland2_raw::CModInfo;
 use scotland2_rs::ModInfoBuf;
+use tokio::net::TcpSocket;
 use tokio::runtime::Runtime;
 use tokio::sync::RwLock;
-use tokio_tungstenite::connect_async;
 use tracing::debug;
 use web_context::SongData;
 
 mod web_context;
 
 mod async_utils;
+mod config;
 mod proto;
 
 // Define a static runtime
@@ -218,27 +223,63 @@ extern "C" fn late_load() {
     debug!("Setting up SongCore events");
     unsafe { quest_compat_init() };
 
-    debug!("Setting up websocket");
-    RUNTIME.block_on(async {
-        setup_client().await;
+    debug!("Setting up socket");
+    let player_model = Resources::FindObjectsOfTypeAll_1::<Gc<PlayerDataModel>>()
+        .expect("Failed to find PlayerDataModel 1")
+        .as_slice()
+        .first()
+        .copied()
+        .expect("Failed to find PlayerDataModel 2");
+
+    RUNTIME.spawn(async move {
+        if let Err(err) = setup_client(player_model).await {
+            tracing::error!("Failed to setup client: {:?}", err);
+        }
     });
 }
 
-async fn setup_client() {
-    let url = "ws://"; // TODO:
+async fn setup_client(player_model: Gc<PlayerDataModel>) -> anyhow::Result<()> {
+    let id = unsafe { CStr::from_ptr(scotland2_rs::scotland2_raw::modloader_get_application_id()) };
+    let path: PathBuf = format!(
+        "/sdcard/ModData/{}/Configs/config.json",
+        id.to_string_lossy()
+    )
+    .into();
 
-    let (ws_stream, _response) = connect_async(url).await.expect("Failed to connect");
+    let config: Config = if tokio::fs::try_exists(&path).await.is_err() {
+        let data = tokio::fs::read(path)
+            .await
+            .context("Config unable to be loaded")?;
+
+        serde_json::from_slice(&data).context("Failed to parse config")?
+    } else {
+        let config = Config {
+            addr: "127.0.0.1:8080".to_string(),
+        };
+        tokio::fs::write(path, serde_json::to_vec(&config)?).await?;
+        config
+    };
+
+    let addr = config.addr.parse().unwrap();
+
+    let socket = TcpSocket::new_v4()?;
+    let stream = socket.connect(addr).await?;
+
+    // let (ws_stream, _response) = connect_async(url).await.expect("Failed to connect");
 
     let mut web_context_locked = unsafe { WEB_CONTEXT.write().await };
 
     let web_context = web_context_locked.insert(web_context::WebContext {
-        socket: todo!(),
+        socket: stream,
         flow: None,
         get_status_cancellation_token_source: None,
         level_cancellation_token_source: None,
         songs: Default::default(),
-        player_data: todo!(),
+        player_data: player_model,
     });
-
     println!("WebSocket handshake has been successfully completed");
+
+    web_context.read_loop().await?;
+
+    Ok(())
 }
